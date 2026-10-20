@@ -1,22 +1,16 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource/ibm-plex-mono/300.css";
 @import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
-@import "@fontsource-variable/fraunces";
 
 /* El tema oscuro se activa con la clase .dark en <html> (ver index.html y useTheme). */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    /* DESIGN.md: serif editorial solo para titulares grandes; monoespaciada para toda la interfaz. */
-    --font-heading: 'Fraunces Variable', ui-serif, Georgia, serif;
-    --font-sans: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    /* Fuentes del sistema (sin descargas): sans para toda la interfaz; mono solo para códigos y claves. */
+    --font-heading: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-sans: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-    /* Pesos 300 / 400 / 500: nada más grueso. */
-    --font-weight-semibold: 500;
-    --font-weight-bold: 500;
     --color-highlight: var(--highlight);
     --color-tag-border: var(--tag-border);
     --color-sidebar-ring: var(--sidebar-ring);
@@ -61,119 +55,116 @@
     --color-danger-soft: var(--danger-soft);
     --color-grid: var(--grid);
     --shadow-card: var(--shadow);
-    /* DESIGN.md: 3px en botones, campos, etiquetas y navegación; 8px en tarjetas y diálogos. */
-    --radius-sm: 3px;
-    --radius-md: 3px;
-    --radius-lg: 3px;
-    --radius-xl: 8px;
-    --radius-2xl: 8px;
-    --radius-3xl: 8px;
-    --radius-4xl: 8px;
+    /* DESIGN.md: 6px en botones, campos y etiquetas; 12px en tarjetas y diálogos. */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 6px;
+    --radius-xl: 12px;
+    --radius-2xl: 12px;
+    --radius-3xl: 16px;
+    --radius-4xl: 16px;
 }
 
-/* Paleta según DESIGN.md («Visual»): papel crema, tinta casi negra, neutros oliva-salvia, superficie
-   carbón para la acción principal y el amarillo resaltador solo como marca decorativa (2–4 px).
-   Sin sombras: la jerarquía viene de bordes finos y contraste. Texto verificado ≥ 4,5:1.
-   Desviaciones por legibilidad: el texto de etiquetas usa Olive Char (#57584b) en vez de Lichen
-   (4,2:1 sobre Bone); los estados de advertencia y error usan ocre y terracota apagados, siempre con
-   icono y texto. Colores de gráficos validados para daltonismo (oliva / ocre). */
+/* Paleta pastel (ver DESIGN.md): fondo gris azulado muy claro, tarjetas blancas, acción principal
+   en azul pastel con texto azul oscuro y estados en menta / durazno / rosa suaves.
+   Texto verificado ≥ 4,5:1 y bordes de campos ≥ 3:1. Gráficos: azul y durazno para real vs.
+   estimado (distinguibles con daltonismo). Sombras muy suaves solo en tarjetas. */
 :root {
     color-scheme: light;
-    --background: #f6f6f4; /* Vellum */
-    --foreground: #000000; /* Ink */
-    --card: #ffffff; /* Paper */
-    --card-foreground: #000000;
+    --background: #f6f8fc;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --card-foreground: #1f2937;
     --popover: #ffffff;
-    --popover-foreground: #000000;
-    --primary: #2c2c26; /* Carbon: único botón relleno */
-    --primary-foreground: #ffffff;
-    --secondary: #e8e7d9; /* Bone */
-    --secondary-foreground: #57584b;
-    --muted: #efefe9;
-    --muted-foreground: #6d6e5e; /* Lichen */
-    --accent: #efefe9;
-    --accent-foreground: #000000;
-    --destructive: #9a3b2e;
-    --border: #d0d0c8; /* Ash */
-    --input: #8e8f7d; /* borde de campos con contraste ≥ 3:1 */
-    --ring: #000000;
-    --highlight: #fff347; /* Highlighter Yellow: solo decorativo */
-    --tag-border: #aaa674; /* Khaki Olive */
-    --chart-1: #5d6c14;
-    --chart-pos: #5d6c14;
-    --chart-neg: #b98a3e;
-    --chart-2: #6d6e5e;
-    --chart-3: #b98a3e;
-    --chart-4: #aaab9c;
-    --chart-5: #2c2c26;
-    --radius: 3px;
-    --sidebar: #f6f6f4;
-    --sidebar-foreground: #6d6e5e;
-    --sidebar-primary: #2c2c26;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #e8e7d9;
-    --sidebar-accent-foreground: #000000;
-    --sidebar-border: #d0d0c8;
-    --sidebar-ring: #000000;
-    --success: #2c2c26;
-    --success-soft: #e8e7d9;
-    --warning: #6b5e12;
-    --warning-soft: #f3efcf;
-    --danger: #9a3b2e;
-    --danger-soft: #f6e2dc;
-    --grid: #d0d0c8;
-    --shadow: none;
-    /* Único sombreado del sistema: borde suave al pasar el cursor por botones del menú y la barra. */
-    --hover-shadow: 0 0 0 1px #d0d0c8, 0 2px 6px rgba(44, 44, 38, 0.14);
+    --popover-foreground: #1f2937;
+    --primary: #b9d1f5; /* azul pastel */
+    --primary-foreground: #183357;
+    --secondary: #eef2f9;
+    --secondary-foreground: #33445f;
+    --muted: #f1f4f9;
+    --muted-foreground: #5b6577;
+    --accent: #e7effb;
+    --accent-foreground: #183357;
+    --destructive: #b03e3e;
+    --border: #e2e7f0;
+    --input: #8a94a6; /* borde de campos con contraste ≥ 3:1 */
+    --ring: #5f86cf;
+    --highlight: #8fb2ec; /* marca del elemento activo del menú */
+    --tag-border: #c8d5ec;
+    --chart-1: #5b8def;
+    --chart-pos: #5b8def;
+    --chart-neg: #c97a2e;
+    --chart-2: #5fb48c;
+    --chart-3: #c97a2e;
+    --chart-4: #a08bd6;
+    --chart-5: #e07d90;
+    --radius: 6px;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #4b5568;
+    --sidebar-primary: #b9d1f5;
+    --sidebar-primary-foreground: #183357;
+    --sidebar-accent: #e7effb;
+    --sidebar-accent-foreground: #183357;
+    --sidebar-border: #e2e7f0;
+    --sidebar-ring: #5f86cf;
+    --success: #2c6a4c;
+    --success-soft: #dff3e8;
+    --warning: #7a5710;
+    --warning-soft: #fbf0d6;
+    --danger: #a23a3a;
+    --danger-soft: #fbe3e3;
+    --grid: #e6eaf1;
+    --shadow: 0 1px 2px rgba(31, 41, 55, 0.04), 0 1px 3px rgba(31, 41, 55, 0.05);
+    --hover-shadow: 0 0 0 1px #e2e7f0, 0 2px 6px rgba(31, 41, 55, 0.08);
 }
 
-/* Modo oscuro (DESIGN.md solo define el claro): la misma paleta sobre carbón. */
+/* Modo oscuro: pizarra suave con los mismos tonos pastel como acentos. */
 .dark {
     color-scheme: dark;
-    --background: #1b1b17;
-    --foreground: #f6f6f4;
-    --card: #23231e;
-    --card-foreground: #f6f6f4;
-    --popover: #2c2c26;
-    --popover-foreground: #f6f6f4;
-    --primary: #f6f6f4;
-    --primary-foreground: #2c2c26;
-    --secondary: #33332c;
-    --secondary-foreground: #e8e7d9;
-    --muted: #2a2a24;
-    --muted-foreground: #b5b6a6;
-    --accent: #33332c;
-    --accent-foreground: #f6f6f4;
-    --destructive: #f0a698;
-    --border: #3d3d35;
-    --input: #7d7e6d;
-    --ring: #f6f6f4;
-    --highlight: #fff347;
-    --tag-border: #8a8760;
-    --chart-1: #5d6c14;
-    --chart-pos: #5d6c14;
-    --chart-neg: #b98a3e;
-    --chart-2: #b5b6a6;
-    --chart-3: #b98a3e;
-    --chart-4: #6d6e5e;
-    --chart-5: #f6f6f4;
-    --sidebar: #1b1b17;
-    --sidebar-foreground: #b5b6a6;
-    --sidebar-primary: #f6f6f4;
-    --sidebar-primary-foreground: #2c2c26;
-    --sidebar-accent: #33332c;
-    --sidebar-accent-foreground: #f6f6f4;
-    --sidebar-border: #3d3d35;
-    --sidebar-ring: #f6f6f4;
-    --success: #e8e7d9;
-    --success-soft: #33332c;
-    --warning: #e6d77a;
-    --warning-soft: #3a3519;
-    --danger: #f0a698;
-    --danger-soft: #45231d;
-    --grid: #3d3d35;
-    --shadow: none;
-    --hover-shadow: 0 0 0 1px #3d3d35, 0 2px 8px rgba(0, 0, 0, 0.5);
+    --background: #141821;
+    --foreground: #e6e9f0;
+    --card: #1b202b;
+    --card-foreground: #e6e9f0;
+    --popover: #222835;
+    --popover-foreground: #e6e9f0;
+    --primary: #a9c5f2;
+    --primary-foreground: #142440;
+    --secondary: #262d3a;
+    --secondary-foreground: #dbe2ee;
+    --muted: #222835;
+    --muted-foreground: #a5adbd;
+    --accent: #24314a;
+    --accent-foreground: #dce7fa;
+    --destructive: #f2a7a7;
+    --border: #2d3442;
+    --input: #6b7489;
+    --ring: #a9c5f2;
+    --highlight: #a9c5f2;
+    --tag-border: #3c4a66;
+    --chart-1: #8fb3f5;
+    --chart-pos: #8fb3f5;
+    --chart-neg: #f0b57a;
+    --chart-2: #8bd3b0;
+    --chart-3: #f0b57a;
+    --chart-4: #c2b2ea;
+    --chart-5: #f0a3b1;
+    --sidebar: #171b25;
+    --sidebar-foreground: #a5adbd;
+    --sidebar-primary: #a9c5f2;
+    --sidebar-primary-foreground: #142440;
+    --sidebar-accent: #24314a;
+    --sidebar-accent-foreground: #dce7fa;
+    --sidebar-border: #2d3442;
+    --sidebar-ring: #a9c5f2;
+    --success: #9fd9bb;
+    --success-soft: #1d3329;
+    --warning: #f0d08a;
+    --warning-soft: #3a3019;
+    --danger: #f2a7a7;
+    --danger-soft: #3d2224;
+    --grid: #2d3442;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --hover-shadow: 0 0 0 1px #2d3442, 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 @layer base {
@@ -182,8 +173,6 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    /* DESIGN.md: tracking cerrado en la monoespaciada de la interfaz. */
-    letter-spacing: -0.04em;
   }
   html {
     @apply font-sans;
