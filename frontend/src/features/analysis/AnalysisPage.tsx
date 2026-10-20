@@ -259,7 +259,7 @@ export function AnalysisPage() {
                   ) : (
                     <ChartOrTable
                       title="captación por atrapanieblas"
-                      chart={<CategoryBars unit=" L" rows={a.capture.by_fog_collector.map((f) => ({ label: f.name, value: f.total }))} />}
+                      chart={<CategoryBars color="var(--chart-2)" unit=" L" rows={a.capture.by_fog_collector.map((f) => ({ label: f.name, value: f.total }))} />}
                       table={<CategoryTable unit=" L" rows={a.capture.by_fog_collector.map((f) => ({ label: f.name, value: f.total }))} />}
                     />
                   )}
@@ -300,7 +300,7 @@ export function AnalysisPage() {
                     }
                   />
                   <p className="text-muted-foreground mt-3 text-xs">
-                    Terracota: relación positiva · violeta: negativa. Una correlación indica asociación, no causa; con pocos
+                    Azul: relación positiva · naranja: negativa. Una correlación indica asociación, no causa; con pocos
                     días los valores son poco confiables.
                   </p>
                 </Section>
@@ -371,7 +371,7 @@ export function AnalysisPage() {
 
               <div className="grid gap-5 lg:grid-cols-2">
                 <Section title="Calidad de las lecturas">
-                  <ChartOrTable title="calidad de las lecturas" chart={<CategoryBars rows={toRows(a.quality?.by_quality ?? {}, QUALITY_LABELS)} />} table={<Counts data={a.quality?.by_quality ?? {}} labels={QUALITY_LABELS} />} />
+                  <ChartOrTable title="calidad de las lecturas" chart={<CategoryBars color="var(--chart-2)" rows={toRows(a.quality?.by_quality ?? {}, QUALITY_LABELS)} />} table={<Counts data={a.quality?.by_quality ?? {}} labels={QUALITY_LABELS} />} />
                 </Section>
                 <Section title="Lecturas válidas por estación">
                   <Table>
@@ -403,9 +403,9 @@ export function AnalysisPage() {
                     <div className="text-xl font-semibold tabular-nums">{num(a.incidents.hours_to_finish.mean)}</div>
                   </div>
                 </div>
-                <ChartOrTable title="reportes por estado" chart={<CategoryBars rows={toRows(a.incidents.by_status, STATUS_LABELS)} />} table={<Counts data={a.incidents.by_status} labels={STATUS_LABELS} />} />
+                <ChartOrTable title="reportes por estado" chart={<CategoryBars color="var(--chart-3)" rows={toRows(a.incidents.by_status, STATUS_LABELS)} />} table={<Counts data={a.incidents.by_status} labels={STATUS_LABELS} />} />
                 <div className="mt-3">
-                  <ChartOrTable title="reportes por prioridad" chart={<CategoryBars rows={toRows(a.incidents.by_priority, PRIORITY_LABELS)} />} table={<Counts data={a.incidents.by_priority} labels={PRIORITY_LABELS} />} />
+                  <ChartOrTable title="reportes por prioridad" chart={<CategoryBars color="var(--chart-5)" rows={toRows(a.incidents.by_priority, PRIORITY_LABELS)} />} table={<Counts data={a.incidents.by_priority} labels={PRIORITY_LABELS} />} />
                 </div>
               </Section>
             )}
@@ -414,9 +414,9 @@ export function AnalysisPage() {
                 title="Mantenimientos finalizados"
                 subtitle={`${a.maintenance.total} en el periodo · ${a.maintenance.from_incidents} por reportes de incidencia · ${a.maintenance.with_parts} con repuestos`}
               >
-                <ChartOrTable title="mantenimientos por tipo" chart={<CategoryBars rows={toRows(a.maintenance.by_type, TYPE_LABELS)} />} table={<Counts data={a.maintenance.by_type} labels={TYPE_LABELS} />} />
+                <ChartOrTable title="mantenimientos por tipo" chart={<CategoryBars color="var(--chart-4)" rows={toRows(a.maintenance.by_type, TYPE_LABELS)} />} table={<Counts data={a.maintenance.by_type} labels={TYPE_LABELS} />} />
                 <div className="mt-3">
-                  <ChartOrTable title="estado final de los componentes" chart={<CategoryBars rows={toRows(a.maintenance.by_final_status, FINAL_LABELS)} />} table={<Counts data={a.maintenance.by_final_status} labels={FINAL_LABELS} />} />
+                  <ChartOrTable title="estado final de los componentes" chart={<CategoryBars color="var(--chart-2)" rows={toRows(a.maintenance.by_final_status, FINAL_LABELS)} />} table={<Counts data={a.maintenance.by_final_status} labels={FINAL_LABELS} />} />
                 </div>
               </Section>
             )}

@@ -54,6 +54,16 @@
     --color-danger: var(--danger);
     --color-danger-soft: var(--danger-soft);
     --color-grid: var(--grid);
+    --color-tone-blue: var(--tone-blue);
+    --color-tone-blue-foreground: var(--tone-blue-foreground);
+    --color-tone-mint: var(--tone-mint);
+    --color-tone-mint-foreground: var(--tone-mint-foreground);
+    --color-tone-peach: var(--tone-peach);
+    --color-tone-peach-foreground: var(--tone-peach-foreground);
+    --color-tone-lavender: var(--tone-lavender);
+    --color-tone-lavender-foreground: var(--tone-lavender-foreground);
+    --color-tone-rose: var(--tone-rose);
+    --color-tone-rose-foreground: var(--tone-rose-foreground);
     --shadow-card: var(--shadow);
     /* DESIGN.md: 6px en botones, campos y etiquetas; 12px en tarjetas y diálogos. */
     --radius-sm: 4px;
@@ -71,7 +81,7 @@
    estimado (distinguibles con daltonismo). Sombras muy suaves solo en tarjetas. */
 :root {
     color-scheme: light;
-    --background: #f6f8fc;
+    --background: #eef2f8;
     --foreground: #1f2937;
     --card: #ffffff;
     --card-foreground: #1f2937;
@@ -86,7 +96,7 @@
     --accent: #e7effb;
     --accent-foreground: #183357;
     --destructive: #b03e3e;
-    --border: #e2e7f0;
+    --border: #dde3ee;
     --input: #8a94a6; /* borde de campos con contraste ≥ 3:1 */
     --ring: #5f86cf;
     --highlight: #8fb2ec; /* marca del elemento activo del menú */
@@ -94,10 +104,10 @@
     --chart-1: #5b8def;
     --chart-pos: #5b8def;
     --chart-neg: #c97a2e;
-    --chart-2: #5fb48c;
+    --chart-2: #3f9a72;
     --chart-3: #c97a2e;
-    --chart-4: #a08bd6;
-    --chart-5: #e07d90;
+    --chart-4: #8a72cc;
+    --chart-5: #d06478;
     --radius: 6px;
     --sidebar: #ffffff;
     --sidebar-foreground: #4b5568;
@@ -114,6 +124,17 @@
     --danger: #a23a3a;
     --danger-soft: #fbe3e3;
     --grid: #e6eaf1;
+    /* Tonos de acento para distinguir indicadores y secciones (fondo suave + texto oscuro, ≥ 5,5:1). */
+    --tone-blue: #dbe8fb;
+    --tone-blue-foreground: #1d4e89;
+    --tone-mint: #d9f2e5;
+    --tone-mint-foreground: #1f6146;
+    --tone-peach: #fde6cf;
+    --tone-peach-foreground: #8a4b12;
+    --tone-lavender: #e9e2fa;
+    --tone-lavender-foreground: #4f3a8f;
+    --tone-rose: #fbe0e6;
+    --tone-rose-foreground: #8f2f45;
     --shadow: 0 1px 2px rgba(31, 41, 55, 0.04), 0 1px 3px rgba(31, 41, 55, 0.05);
     --hover-shadow: 0 0 0 1px #e2e7f0, 0 2px 6px rgba(31, 41, 55, 0.08);
 }
@@ -121,9 +142,9 @@
 /* Modo oscuro: pizarra suave con los mismos tonos pastel como acentos. */
 .dark {
     color-scheme: dark;
-    --background: #141821;
+    --background: #0f1218;
     --foreground: #e6e9f0;
-    --card: #1b202b;
+    --card: #1c212c;
     --card-foreground: #e6e9f0;
     --popover: #222835;
     --popover-foreground: #e6e9f0;
@@ -136,7 +157,7 @@
     --accent: #24314a;
     --accent-foreground: #dce7fa;
     --destructive: #f2a7a7;
-    --border: #2d3442;
+    --border: #313847;
     --input: #6b7489;
     --ring: #a9c5f2;
     --highlight: #a9c5f2;
@@ -163,6 +184,16 @@
     --danger: #f2a7a7;
     --danger-soft: #3d2224;
     --grid: #2d3442;
+    --tone-blue: #223150;
+    --tone-blue-foreground: #cfe0fb;
+    --tone-mint: #1d3a2d;
+    --tone-mint-foreground: #c3ecd6;
+    --tone-peach: #40301f;
+    --tone-peach-foreground: #f8d2ae;
+    --tone-lavender: #30284a;
+    --tone-lavender-foreground: #ddd3f7;
+    --tone-rose: #45242d;
+    --tone-rose-foreground: #f7c9d3;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     --hover-shadow: 0 0 0 1px #2d3442, 0 2px 8px rgba(0, 0, 0, 0.4);
 }

@@ -3,9 +3,12 @@
 > **Vigente desde 2026-10-20: estilo pastel sobrio.** Esta sección manda sobre todo lo que sigue.
 > Los valores exactos viven en `frontend/src/index.css` (`:root` y `.dark`); no escribir colores hex en componentes.
 >
-> - **Paleta:** fondo `#f6f8fc`, tarjetas `#ffffff`, texto `#1f2937`, texto secundario `#5b6577`, bordes `#e2e7f0`.
+> - **Paleta:** fondo `#eef2f8`, tarjetas `#ffffff`, texto `#1f2937`, texto secundario `#5b6577`, bordes `#e2e7f0`.
 >   Acción principal en azul pastel `#b9d1f5` con texto `#183357`. Estados: menta (éxito), durazno (advertencia), rosa (error),
->   siempre con icono y texto. Gráficos: real `#5b8def` vs. estimado `#c97a2e`.
+>   siempre con icono y texto. Gráficos: real `#5b8def` vs. estimado `#c97a2e`; cada gráfico usa
+>   su propio color `--chart-1..5`.
+> - **Diferenciar secciones:** tonos `tone-blue|mint|peach|lavender|rose` (StatCard `color`), encabezados de tarjeta
+>   con fondo suave y tablas con filas alternas.
 > - **Tipografía:** sans del sistema para toda la interfaz; mono solo para códigos/claves. Títulos `font-semibold`, sin
 >   tracking negativo, sin mayúsculas sostenidas. Título de página 24–28 px.
 > - **Forma:** radios 6 px (controles) y 12 px (tarjetas); sombra muy suave solo en tarjetas.

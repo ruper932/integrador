@@ -124,6 +124,16 @@ export function EmptyState({
   )
 }
 
+export type ToneColor = 'blue' | 'mint' | 'peach' | 'lavender' | 'rose'
+
+const TONE_COLOR: Record<ToneColor, string> = {
+  blue: 'bg-tone-blue text-tone-blue-foreground',
+  mint: 'bg-tone-mint text-tone-mint-foreground',
+  peach: 'bg-tone-peach text-tone-peach-foreground',
+  lavender: 'bg-tone-lavender text-tone-lavender-foreground',
+  rose: 'bg-tone-rose text-tone-rose-foreground',
+}
+
 export function StatCard({
   label,
   value,
@@ -131,6 +141,7 @@ export function StatCard({
   icon: Icon,
   foot,
   tone,
+  color = 'blue',
 }: {
   label: string
   value: ReactNode
@@ -138,13 +149,14 @@ export function StatCard({
   icon?: LucideIcon
   foot?: ReactNode
   tone?: 'success' | 'warning'
+  color?: ToneColor
 }) {
   return (
     <div className="bg-card shadow-card min-w-0 rounded-xl border p-4 sm:p-5">
       <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
         <span>{label}</span>
         {Icon && (
-          <span className="bg-muted text-foreground hidden rounded-lg p-2 sm:inline-flex">
+          <span className={cn('hidden rounded-lg p-2 sm:inline-flex', TONE_COLOR[color])}>
             <Icon className="size-4" aria-hidden />
           </span>
         )}
@@ -170,7 +182,7 @@ export function StatCard({
 /** Encabezado de tarjeta al estilo de la plantilla: título, subtítulo y acciones con separador. */
 export function CardHead({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="-mt-(--card-spacing) flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+    <div className="-mt-(--card-spacing) bg-muted/60 flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
       <div className="min-w-0">
         <h2 className="text-sm font-semibold">{title}</h2>
         {subtitle && <div className="text-muted-foreground mt-0.5 text-xs">{subtitle}</div>}

@@ -168,7 +168,7 @@ export function DailyCaptureChart({
 // --- Histograma: cuántos días cayeron en cada rango de captación ---------------------------
 
 
-export function Histogram({ values }: { values: number[] }) {
+export function Histogram({ values, color = 'var(--chart-4)' }: { values: number[]; color?: string }) {
   const data = histogram(values).map((b) => ({ ...b, x: `${formatNumber(b.from, 0)}–${formatNumber(b.to, 0)}` }))
   return (
     <div className="h-64 w-full" role="img" aria-label="Distribución de la captación diaria">
@@ -183,7 +183,7 @@ export function Histogram({ values }: { values: number[] }) {
             labelFormatter={(label) => `${label} L por día`}
             formatter={(value) => [`${value} días`, 'Frecuencia']}
           />
-          <Bar dataKey="count" fill={SERIES} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          <Bar dataKey="count" fill={color} radius={[4, 4, 0, 0]} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -305,7 +305,15 @@ export function ScatterPlot({
 
 // --- Barras horizontales de categorías (estados, tipos, atrapanieblas, repuestos) -----------
 
-export function CategoryBars({ rows, unit = '' }: { rows: { label: string; value: number }[]; unit?: string }) {
+export function CategoryBars({
+  rows,
+  unit = '',
+  color = SERIES,
+}: {
+  rows: { label: string; value: number }[]
+  unit?: string
+  color?: string
+}) {
   const total = rows.reduce((s, r) => s + r.value, 0)
   if (total === 0) return <p className="text-muted-foreground text-sm">Sin registros en el periodo.</p>
   const data = [...rows].sort((a, b) => b.value - a.value)
@@ -322,7 +330,7 @@ export function CategoryBars({ rows, unit = '' }: { rows: { label: string; value
           />
           <Bar
             dataKey="value"
-            fill={SERIES}
+            fill={color}
             radius={4}
             isAnimationActive={false}
             label={{
