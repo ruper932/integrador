@@ -415,8 +415,9 @@ export function FogCollectorsPage() {
       ) : (
         <div className="grid gap-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Atrapanieblas activos" value={active.length} icon={CloudFog} foot={`${items.length} registrados`} />
+            <StatCard color="lavender" label="Atrapanieblas activos" value={active.length} icon={CloudFog} foot={`${items.length} registrados`} />
             <StatCard
+              color="mint"
               label="Operativos"
               value={active.filter((f) => f.status === 'operativo').length}
               icon={Gauge}
@@ -424,6 +425,7 @@ export function FogCollectorsPage() {
               foot={`${active.filter((f) => f.status !== 'operativo').length} requieren atención`}
             />
             <StatCard
+              color="peach"
               label="Área de malla"
               value={formatNumber(
                 active.reduce((s, f) => s + Number(f.mesh_area_m2 ?? 0), 0),
@@ -433,6 +435,7 @@ export function FogCollectorsPage() {
               icon={Compass}
             />
             <StatCard
+              color="blue"
               label="Captación, últimos 7 días"
               value={formatNumber(
                 active.reduce((s, f) => s + f.volume_last_7_days, 0),

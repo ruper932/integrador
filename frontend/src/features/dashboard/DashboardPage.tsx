@@ -13,7 +13,7 @@ import {
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
-import { CardHead, EmptyState, ErrorAlert, Loading, NativeSelect, Notice, PageHeader, StatCard } from '@/components/common'
+import { CardHead, EmptyState, ErrorAlert, Loading, NativeSelect, Notice, PageHeader, StatCard, type ToneColor } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -56,10 +56,21 @@ function latestOf(latest: LatestValue[], code: string): LatestValue | undefined 
     .sort((a, b) => b.measured_at.localeCompare(a.measured_at))[0]
 }
 
-function LatestStat({ value, label, icon }: { value?: LatestValue; label: string; icon: typeof Activity }) {
-  if (!value) return <StatCard label={label} value="—" icon={icon} foot="Sin lecturas válidas aún" />
+function LatestStat({
+  value,
+  label,
+  icon,
+  color,
+}: {
+  value?: LatestValue
+  label: string
+  icon: typeof Activity
+  color: ToneColor
+}) {
+  if (!value) return <StatCard color={color} label={label} value="—" icon={icon} foot="Sin lecturas válidas aún" />
   return (
     <StatCard
+      color={color}
       label={label}
       value={formatNumber(value.value, 1)}
       unit={unitText(value.unit)}
@@ -141,18 +152,20 @@ export function DashboardPage() {
 
       <section aria-label="Indicadores principales" className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
+          color="blue"
           label="Agua captada hoy"
           value={formatNumber(data.volume.today_liters, 1)}
           unit="litros"
           icon={Droplets}
           foot={`Últimos 7 días: ${formatNumber(data.volume.last_7_days_liters, 1)} L · mes: ${formatNumber(data.volume.month_liters, 1)} L`}
         />
-        <LatestStat label="Humedad relativa" value={latestOf(data.latest, 'humedad_relativa')} icon={Activity} />
-        <LatestStat label="Temperatura ambiente" value={latestOf(data.latest, 'temperatura')} icon={Thermometer} />
+        <LatestStat color="mint" label="Humedad relativa" value={latestOf(data.latest, 'humedad_relativa')} icon={Activity} />
+        <LatestStat color="peach" label="Temperatura ambiente" value={latestOf(data.latest, 'temperatura')} icon={Thermometer} />
         {tank ? (
-          <LatestStat label="Nivel del tanque" value={tank} icon={Gauge} />
+          <LatestStat color="lavender" label="Nivel del tanque" value={tank} icon={Gauge} />
         ) : (
           <StatCard
+            color="lavender"
             label="Agua captada en el mes"
             value={formatNumber(data.volume.month_liters, 1)}
             unit="litros"

@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form'
 import { useSearchParams } from 'react-router'
 import { z } from 'zod'
 
-import { EmptyState, ErrorAlert, Field, Loading, NativeSelect, Notice, PageHeader, Pagination, StatCard } from '@/components/common'
+import { EmptyState, ErrorAlert, Field, Loading, NativeSelect, Notice, PageHeader, Pagination, StatCard, type ToneColor } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -27,6 +27,13 @@ import type { Incident, IncidentScope, IncidentStatus, IncidentSummary, Page } f
 
 const LIMIT = 20
 const PRIORITIES = ['alta', 'media', 'baja'] as const
+// Mismo significado de color en toda la app: rosa abierto, lavanda aceptado, durazno en curso, menta finalizado.
+const STATUS_COLOR: Record<IncidentStatus, ToneColor> = {
+  abierto: 'rose',
+  aceptado: 'lavender',
+  en_progreso: 'peach',
+  finalizado: 'mint',
+}
 
 // Pestañas en orden de preferencia; cada una exige un permiso (el backend también lo valida).
 const TABS: { scope: IncidentScope; label: string; permission: string }[] = [
@@ -319,13 +326,14 @@ function SummaryCards({ summary, scopes }: { summary: IncidentSummary; scopes: I
     return (
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
+          color="rose"
           label="Reportes por atender"
           value={summary.open ?? 0}
           icon={Inbox}
           tone={summary.open ? 'warning' : undefined}
           foot={summary.open ? 'Esperan que alguien los acepte' : 'No hay reportes pendientes'}
         />
-        <StatCard label="Asignados a mí en curso" value={summary.assigned_active ?? 0} icon={Wrench} />
+        <StatCard color="peach" label="Asignados a mí en curso" value={summary.assigned_active ?? 0} icon={Wrench} />
       </div>
     )
   }
@@ -333,7 +341,7 @@ function SummaryCards({ summary, scopes }: { summary: IncidentSummary; scopes: I
   return (
     <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
       {STATUS_ORDER.map((s) => (
-        <StatCard key={s} label={STATUS_LABELS[s]} value={counts[s] ?? 0} />
+        <StatCard key={s} color={STATUS_COLOR[s]} label={STATUS_LABELS[s]} value={counts[s] ?? 0} />
       ))}
     </div>
   )

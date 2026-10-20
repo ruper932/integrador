@@ -186,8 +186,9 @@ export function AnalysisPage() {
           {a.capture && (
             <>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Agua captada en el periodo" value={num(a.capture.total)} unit="L" icon={Droplets} />
+                <StatCard color="blue" label="Agua captada en el periodo" value={num(a.capture.total)} unit="L" icon={Droplets} />
                 <StatCard
+                  color="lavender"
                   label="Promedio diario"
                   value={num(a.capture.daily.mean)}
                   unit="L/día"
@@ -195,12 +196,14 @@ export function AnalysisPage() {
                   foot={`Mediana ${num(a.capture.daily.median)} L · desviación ${num(a.capture.daily.std)} L`}
                 />
                 <StatCard
+                  color="peach"
                   label="Días con captación"
                   value={a.capture.days_with_capture}
                   icon={CalendarCheck}
                   foot={`de ${a.capture.days_with_data} días con datos${a.capture.best_day ? ` · máximo el ${a.capture.best_day}` : ''}`}
                 />
                 <StatCard
+                  color="mint"
                   label="Lecturas válidas"
                   value={pct(a.quality?.valid_share)}
                   icon={ShieldCheck}
