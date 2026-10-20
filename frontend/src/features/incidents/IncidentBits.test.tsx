@@ -15,6 +15,8 @@ const incident: Incident = {
   device_name: 'Estación norte',
   sensor_id: null,
   sensor_code: null,
+  source: 'usuario',
+  auto_cause: null,
   reporter: { id: 3, username: 'lticona', full_name: 'Lucía Ticona' },
   assignee: { id: 5, username: 'mhuanca', full_name: 'Marco Huanca' },
   created_at: '2026-10-15T14:00:00Z',
@@ -55,4 +57,11 @@ test('el seguimiento muestra quién atiende el reporte y las etapas pendientes',
 test('el estado se muestra con texto, no solo con color', () => {
   render(<IncidentStatusBadge status="en_progreso" />)
   expect(screen.getByText('En progreso')).toBeInTheDocument()
+})
+
+test('un reporte abierto por el sistema se identifica sin autor', () => {
+  render(<IncidentTimeline incident={{ ...incident, source: 'sistema', auto_cause: 'sin_comunicacion', reporter: null }} />)
+  const first = within(screen.getByRole('list', { name: 'Seguimiento del reporte' })).getAllByRole('listitem')[0]
+  expect(first).toHaveTextContent('Detección automática')
+  expect(first).toHaveTextContent('Sistema')
 })

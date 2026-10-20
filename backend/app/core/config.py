@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     device_stale_minutes: int = 30
     max_readings_per_batch: int = 500
 
+    # Incidencias automáticas: el sistema abre un reporte cuando una estación activa deja de comunicarse
+    # o un sensor acumula lecturas anómalas. La revisión corre dentro de la API cada N minutos.
+    auto_incidents_enabled: bool = True
+    auto_incidents_interval_minutes: int = Field(default=15, ge=1)
+    auto_incident_offline_hours: int = Field(default=6, ge=1)
+    auto_incident_anomaly_window_hours: int = Field(default=24, ge=1)
+    auto_incident_anomaly_threshold: int = Field(default=10, ge=1)
+
 
 @lru_cache
 def get_settings() -> Settings:

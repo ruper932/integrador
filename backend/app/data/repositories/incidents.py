@@ -4,13 +4,15 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import case, func, select, update
+from sqlalchemy import case, func, or_, select, update
 
 from app.data.models.incidents import IncidentReport, Notification
 from app.data.models.inventory import MaintenanceRecord
 from app.data.repositories.base import Repository
 
 INCIDENT_OPEN = "abierto"
+# Clave arbitraria y fija del bloqueo consultivo de PostgreSQL para la detección automática.
+AUTO_DETECTION_LOCK = 72_014_001
 
 
 class IncidentReportRepository(Repository[IncidentReport]):
@@ -79,6 +81,31 @@ class IncidentReportRepository(Repository[IncidentReport]):
             date_to=date_to,
         )
         return self.paginate(stmt.where(*filters), offset=offset, limit=limit)
+
+    def lock_auto_detection(self) -> None:
+        """Bloqueo de transacción: serializa la detección automática entre procesos de la API."""
+        self.session.execute(select(func.pg_advisory_xact_lock(AUTO_DETECTION_LOCK)))
+
+    def has_pending_auto(self, *, device_id: int, cause: str, sensor_id: int | None, finished_since: datetime) -> bool:
+        """¿Hay un reporte automático de la misma causa sin finalizar, o finalizado hace poco?
+        Evita duplicar reportes mientras el problema se atiende o recién se dio por resuelto."""
+        stmt = (
+            select(IncidentReport.id)
+            .outerjoin(MaintenanceRecord, MaintenanceRecord.incident_report_id == IncidentReport.id)
+            .where(
+                IncidentReport.source == "sistema",
+                IncidentReport.auto_cause == cause,
+                IncidentReport.device_id == device_id,
+                IncidentReport.sensor_id.is_(None) if sensor_id is None else IncidentReport.sensor_id == sensor_id,
+                or_(
+                    MaintenanceRecord.id.is_(None),
+                    MaintenanceRecord.status != "finalizado",
+                    MaintenanceRecord.finished_at >= finished_since,
+                ),
+            )
+            .limit(1)
+        )
+        return self.session.scalar(stmt) is not None
 
     def count_by_status(
         self, *, reported_by_id: int | None = None, assigned_to_id: int | None = None

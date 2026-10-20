@@ -239,6 +239,21 @@ Lista de tareas realizadas sobre el proyecto, en orden cronológico. Se actualiz
 - [x] Encabezados con la marca editorial negra y amarilla; ítem activo del menú con trazo amarillo; portada del inicio de sesión en carbón.
 - [x] Colores de gráficos revalidados (oliva / ocre); favicon, barra del navegador y reportes Excel/PDF actualizados; modo oscuro adaptado.
 
+## 2026-10-20
+
+### Estilo pastel sobrio y diferenciación visual
+- [x] Paleta pastel (azul, menta, durazno, lavanda, rosa) con contraste verificado en modo claro y oscuro; tipografía sans del sistema; `DESIGN.md` actualizado con las reglas vigentes.
+- [x] Tarjetas de indicadores con color de acento, encabezados de tarjeta con fondo suave, tablas con filas alternas y un color por gráfico (en el dashboard, según la variable).
+
+### Incidencias automáticas (proceso: sistema → mantenimiento → director/administrador)
+- [x] El sistema abre un reporte de incidencia cuando una estación **activa** no se comunica hace `AUTO_INCIDENT_OFFLINE_HOURS` (6 h, prioridad alta) o un sensor activo acumula `AUTO_INCIDENT_ANOMALY_THRESHOLD` lecturas rechazadas en `AUTO_INCIDENT_ANOMALY_WINDOW_HOURS` (10 en 24 h, prioridad media).
+- [x] El reporte sigue el flujo normal (aceptar → iniciar → finalizar con repuestos). Avisos al personal de mantenimiento y a los supervisores; auditoría `incidencia.reportar_automatica` sin usuario.
+- [x] Sin duplicados: no se abre otro de la misma causa mientras haya uno sin finalizar, ni dentro de la ventana tras finalizarlo. Bloqueo consultivo de PostgreSQL para varios procesos de la API.
+- [x] Revisión periódica dentro de la API cada `AUTO_INCIDENTS_INTERVAL_MINUTES` (15 min; sin cron ni colas) y a demanda con `python -m app.cli check-incidents`.
+- [x] Migración `7b3e9c1d2a40`: `incident_reports.source` (`usuario`/`sistema`), `auto_cause` y autor opcional solo para reportes del sistema (restricción CHECK); el downgrade se niega si hay reportes automáticos. Probada en ambos sentidos.
+- [x] Frontend: insignia «Automática» y «Detectado por el sistema» en la lista, el detalle y la línea de tiempo; exportación con autor «Sistema (detección automática)».
+- [x] 4 pruebas de backend (141 en total) y 1 de frontend (23 en total).
+
 ## Pendiente
 
 - [ ] **Fases 9–11 (ML de producción)** — pendiente por decisión del usuario. La simulación ya probó el flujo. Falta confirmar el horizonte de predicción y las variables de entrada (exigido por `AGENTS.md`) y reunir al menos un año de datos reales. Luego: tablas `ml_models` y `predictions` (migración Alembic), notebook de preparación de datos, entrenamiento con validación temporal, artefacto versionado, servicio de predicción, `POST/GET /api/v1/predictions` y `GET /api/v1/predictions/comparison`, y reporte real vs. estimado.
@@ -252,3 +267,8 @@ Lista de tareas realizadas sobre el proyecto, en orden cronológico. Se actualiz
 - [ ] Las lecturas de la base de desarrollo son simuladas: no usar esa base para entrenar el modelo real.
 - [ ] Actualizar los diagramas UML y de casos de uso (roles `docente`/`director` y nuevo flujo de mantenimiento).
 - [ ] Opcional: dividir el bundle del frontend por rutas (hoy ~1 MB, aceptable en red local).
+- [ ] **Proceso: solicitud de reposición de repuestos** (pendiente de aprobación del alcance). Mantenimiento o el sistema (stock mínimo) crea la solicitud → el director la aprueba o rechaza → el administrador registra la entrada al recibirla → se cierra. Estados `pendiente → aprobada/rechazada → recibida`, auditoría. Requiere tabla nueva con migración.
+- [ ] **Proceso: calibración de sensores** (tabla `sensor_calibrations` ya existe). El sistema avisa la calibración vencida → mantenimiento la realiza y registra valores de referencia y resultado → el administrador la valida; si falla, se abre una incidencia.
+- [ ] **Proceso: plan de mantenimiento preventivo.** Director/administrador programa tareas periódicas (p. ej. limpieza de malla cada 2 semanas) → aviso a mantenimiento al vencer → se ejecuta con el flujo existente → el director ve el cumplimiento (a tiempo / atrasadas).
+- [ ] **Proceso: activación controlada de una versión del modelo ML** (después de las fases 9–11). Administrador entrena y registra métricas → director aprueba el paso a producción → se conserva la versión anterior para comparar.
+- [ ] Incidencias automáticas: ajustar los umbrales con la institución según el comportamiento real de las estaciones.

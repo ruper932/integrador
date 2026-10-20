@@ -416,7 +416,10 @@ export interface Incident {
   device_name: string | null
   sensor_id: number | null
   sensor_code: string | null
-  reporter: Person
+  /** `sistema`: abierto automáticamente (estación sin comunicación o lecturas anómalas); sin autor. */
+  source: 'usuario' | 'sistema'
+  auto_cause: 'sin_comunicacion' | 'lecturas_anomalas' | null
+  reporter: Person | null
   assignee: Person | null
   created_at: string
   maintenance: MaintenanceRecord | null

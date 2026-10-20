@@ -118,6 +118,17 @@ def seed_demo() -> int:
     return 0
 
 
+def check_incidents() -> int:
+    from app.business.services.auto_incident_service import AutoIncidentService
+
+    with SessionLocal() as session:
+        created = AutoIncidentService(session).run()
+    print(f"Incidencias automáticas abiertas: {len(created)}")
+    for report in created:
+        print(f"  #{report.id} {report.title}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Administración local del sistema de atrapanieblas")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -128,7 +139,10 @@ def main() -> int:
     ensure.add_argument("--username", default="admin")
     ensure.add_argument("--full-name", default="Administrador del sistema")
     sub.add_parser("seed-demo", help="Cargar datos de demostración (no disponible en producción)")
+    sub.add_parser("check-incidents", help="Revisar ahora estaciones sin comunicación y sensores con lecturas anómalas")
     args = parser.parse_args()
+    if args.command == "check-incidents":
+        return check_incidents()
     if args.command == "seed-demo":
         return seed_demo()
     if args.command == "create-admin":

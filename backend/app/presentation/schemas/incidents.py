@@ -58,7 +58,9 @@ class IncidentOut(BaseModel):
     device_name: str | None
     sensor_id: int | None
     sensor_code: str | None
-    reporter: PersonOut
+    source: Literal["usuario", "sistema"]
+    auto_cause: Literal["sin_comunicacion", "lecturas_anomalas"] | None
+    reporter: PersonOut | None = Field(description="Autor del reporte; vacío si lo abrió el sistema")
     assignee: PersonOut | None
     created_at: datetime
     maintenance: MaintenanceOut | None

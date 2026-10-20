@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useHasPermission, useMe } from '@/features/auth/useAuth'
 import { useDevices, useSensors } from '@/features/devices/api'
 import { useIncidentSummary } from '@/features/incidents/api'
-import { IncidentStatusBadge, IncidentTimeline, PriorityBadge } from '@/features/incidents/IncidentBits'
+import { AutoBadge, IncidentStatusBadge, IncidentTimeline, PriorityBadge, reporterName } from '@/features/incidents/IncidentBits'
 import { PRIORITY_LABELS, STATUS_LABELS, STATUS_ORDER } from '@/features/incidents/labels'
 import { FINAL_LABELS, TYPE_LABELS } from '@/features/maintenance/labels'
 import { MaintenanceForm } from '@/features/maintenance/MaintenanceForm'
@@ -186,7 +186,7 @@ function IncidentDetail({ id, onClose }: { id: number; onClose: () => void }) {
               </div>
               <DialogTitle className="text-lg">{data.title}</DialogTitle>
               <DialogDescription>
-                Reportado por {data.reporter.full_name} el {formatDateTime(data.created_at)}
+                {data.source === 'sistema' ? 'Detectado por el sistema' : `Reportado por ${reporterName(data)}`} el {formatDateTime(data.created_at)}
               </DialogDescription>
             </DialogHeader>
 
@@ -244,7 +244,11 @@ function IncidentDetail({ id, onClose }: { id: number; onClose: () => void }) {
                 <Button onClick={() => action.mutate('accept')} disabled={action.isPending}>
                   <UserCheck /> Aceptar reporte
                 </Button>
-                <span className="text-muted-foreground text-xs">Quedará asignado a usted y se avisará a quien lo reportó.</span>
+                <span className="text-muted-foreground text-xs">
+                  {data.source === 'sistema'
+                    ? 'Quedará asignado a usted.'
+                    : 'Quedará asignado a usted y se avisará a quien lo reportó.'}
+                </span>
               </div>
             )}
             {isAssignee && data.status === 'aceptado' && (
@@ -291,9 +295,10 @@ function IncidentRow({ incident, onOpen }: { incident: Incident; onOpen: () => v
           <span className="flex flex-wrap items-center gap-2">
             <span className="truncate font-medium">{incident.title}</span>
             {incident.priority === 'alta' && <PriorityBadge priority="alta" />}
+            {incident.source === 'sistema' && <AutoBadge />}
           </span>
           <span className="text-muted-foreground block truncate text-xs">
-            #{incident.id} · {incident.reporter.full_name} · {formatDateTime(incident.created_at)}
+            #{incident.id} · {reporterName(incident)} · {formatDateTime(incident.created_at)}
             {incident.device_name && ` · ${incident.device_name}`}
           </span>
         </span>

@@ -14,17 +14,31 @@ if TYPE_CHECKING:
     from app.data.models.inventory import MaintenanceRecord
 
 INCIDENT_PRIORITIES = ("baja", "media", "alta")
+INCIDENT_SOURCES = ("usuario", "sistema")
+# Causas de los reportes que abre el sistema por sí mismo (ver AutoIncidentService).
+AUTO_CAUSES = ("sin_comunicacion", "lecturas_anomalas")
 
 
 class IncidentReport(Base, TimestampMixin):
-    """Situación reportada por un docente. Su estado se deriva del mantenimiento que la atiende:
-    sin mantenimiento está `abierto`; luego sigue el estado del mantenimiento asociado."""
+    """Situación reportada por un docente o detectada por el sistema (`source`). Su estado se deriva
+    del mantenimiento que la atiende: sin mantenimiento está `abierto`; luego sigue su estado."""
 
     __tablename__ = "incident_reports"
-    __table_args__ = (CheckConstraint(f"priority IN {INCIDENT_PRIORITIES}", name="priority"),)
+    __table_args__ = (
+        CheckConstraint(f"priority IN {INCIDENT_PRIORITIES}", name="priority"),
+        CheckConstraint(f"source IN {INCIDENT_SOURCES}", name="source"),
+        CheckConstraint(f"auto_cause IS NULL OR auto_cause IN {AUTO_CAUSES}", name="auto_cause"),
+        CheckConstraint(
+            "(source = 'usuario' AND reported_by_id IS NOT NULL AND auto_cause IS NULL)"
+            " OR (source = 'sistema' AND reported_by_id IS NULL AND auto_cause IS NOT NULL)",
+            name="source_consistency",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    reported_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    reported_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+    source: Mapped[str] = mapped_column(String(10), default="usuario", server_default="usuario")
+    auto_cause: Mapped[str | None] = mapped_column(String(30))
     title: Mapped[str] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(Text)
     priority: Mapped[str] = mapped_column(String(10), default="media")
@@ -32,7 +46,7 @@ class IncidentReport(Base, TimestampMixin):
     device_id: Mapped[int | None] = mapped_column(ForeignKey("devices.id"), index=True)
     sensor_id: Mapped[int | None] = mapped_column(ForeignKey("sensors.id"))
 
-    reporter: Mapped[User] = relationship(lazy="joined")
+    reporter: Mapped[User | None] = relationship(lazy="joined")
     device: Mapped[Device | None] = relationship(lazy="joined")
     sensor: Mapped[Sensor | None] = relationship(lazy="joined")
     maintenance: Mapped["MaintenanceRecord | None"] = relationship(

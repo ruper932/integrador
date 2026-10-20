@@ -53,7 +53,9 @@ def to_incident_out(report: IncidentReport) -> IncidentOut:
         device_name=report.device.name if report.device else None,
         sensor_id=report.sensor_id,
         sensor_code=report.sensor.code if report.sensor else None,
-        reporter=_person(report.reporter),
+        source=report.source,  # type: ignore[arg-type]
+        auto_cause=report.auto_cause,  # type: ignore[arg-type]
+        reporter=_person(report.reporter) if report.reporter else None,
         assignee=_person(record.user) if record else None,
         created_at=report.created_at,
         maintenance=to_maintenance_out(record) if record else None,

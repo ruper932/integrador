@@ -1,4 +1,4 @@
-import { CheckCircle2, CircleDot, Flag, UserCheck, Wrench, type LucideIcon } from 'lucide-react'
+import { Bot, CheckCircle2, CircleDot, Flag, UserCheck, Wrench, type LucideIcon } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { PRIORITY_LABELS, STATUS_LABELS } from '@/features/incidents/labels'
@@ -32,12 +32,26 @@ export function PriorityBadge({ priority }: { priority: IncidentPriority }) {
   )
 }
 
+/** Autor visible del reporte: los abiertos por el sistema no tienen usuario. */
+export function reporterName(incident: Incident): string {
+  return incident.reporter?.full_name ?? 'Sistema'
+}
+
+export function AutoBadge() {
+  return (
+    <Badge variant="secondary">
+      <Bot aria-hidden />
+      Automática
+    </Badge>
+  )
+}
+
 /** Etapas del reporte con su fecha y responsable; las etapas pendientes se muestran atenuadas. */
 export function IncidentTimeline({ incident }: { incident: Incident }) {
   const m = incident.maintenance
   const assignee = incident.assignee?.full_name
   const steps: { status: IncidentStatus; at: string | null | undefined; who?: string; text: string }[] = [
-    { status: 'abierto', at: incident.created_at, who: incident.reporter.full_name, text: 'Reporte enviado' },
+    { status: 'abierto', at: incident.created_at, who: reporterName(incident), text: incident.source === 'sistema' ? 'Detección automática' : 'Reporte enviado' },
     { status: 'aceptado', at: m?.accepted_at, who: assignee, text: 'Aceptado por el personal de mantenimiento' },
     { status: 'en_progreso', at: m?.started_at, who: assignee, text: 'Mantenimiento en progreso' },
     { status: 'finalizado', at: m?.finished_at, who: assignee, text: 'Mantenimiento finalizado' },

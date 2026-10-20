@@ -1,8 +1,9 @@
 """Reportes de incidencia y su atención mediante mantenimientos.
 
-Flujo: un docente reporta una situación (`abierto`) → el personal de mantenimiento recibe un aviso
-y acepta el reporte, lo que crea el mantenimiento (`aceptado`) → lo inicia (`en_progreso`) → lo
-finaliza registrando el trabajo y los repuestos (`finalizado`), que se descuentan del inventario.
+Flujo: un docente reporta una situación, o el sistema la detecta (ver auto_incident_service), y
+queda `abierto` → el personal de mantenimiento recibe un aviso y acepta el reporte, lo que crea el
+mantenimiento (`aceptado`) → lo inicia (`en_progreso`) → lo finaliza registrando el trabajo y los
+repuestos (`finalizado`), que se descuentan del inventario.
 El docente recibe un aviso en cada etapa; el administrador y el director ven todo el proceso.
 """
 
@@ -293,7 +294,9 @@ class IncidentService:
         return report, locked
 
     def _notify_reporter(self, report: IncidentReport, title: str, message: str) -> None:
-        self.notifications.notify([report.reported_by_id], title, message, incident_report_id=report.id)
+        # Los reportes abiertos por el sistema no tienen autor a quien avisar.
+        if report.reported_by_id is not None:
+            self.notifications.notify([report.reported_by_id], title, message, incident_report_id=report.id)
 
     def _commit(self, report: IncidentReport) -> IncidentReport:
         self.session.commit()

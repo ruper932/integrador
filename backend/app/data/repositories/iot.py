@@ -50,6 +50,12 @@ class DeviceRepository(Repository[Device]):
     def get_by_code(self, code: str) -> Device | None:
         return self.session.scalars(select(Device).where(Device.code == code)).first()
 
+    def list_silent_since(self, cutoff: datetime) -> Sequence[Device]:
+        """Dispositivos activos sin comunicación desde `cutoff` (si nunca enviaron, desde su registro)."""
+        last = func.coalesce(Device.last_seen_at, Device.created_at)
+        stmt = select(Device).where(Device.status == "activo", last < cutoff).order_by(Device.code)
+        return self.session.scalars(stmt).all()
+
 
 class DeviceCredentialRepository(Repository[DeviceCredential]):
     model = DeviceCredential
@@ -165,6 +171,26 @@ class SensorReadingRepository(Repository[SensorReading]):
         if fog_collector_id is not None:
             stmt = stmt.where(Sensor.fog_collector_id == fog_collector_id)
         return [(code, quality, count) for code, quality, count in self.session.execute(stmt)]
+
+    def anomalous_sensors(self, *, since: datetime, threshold: int) -> list[tuple[Sensor, int]]:
+        """Sensores activos (de dispositivos activos) con al menos `threshold` lecturas rechazadas
+        (fuera de rango, unidad inválida o inválidas) recibidas desde `since`."""
+        bad = func.count(SensorReading.id)
+        stmt = (
+            select(Sensor, bad)
+            .join(SensorReading, SensorReading.sensor_id == Sensor.id)
+            .join(Device, Device.id == Sensor.device_id)
+            .where(
+                Sensor.status == "activo",
+                Device.status == "activo",
+                SensorReading.received_at >= since,
+                SensorReading.quality.in_(("fuera_de_rango", "unidad_invalida", "invalida")),
+            )
+            .group_by(Sensor.id)
+            .having(bad >= threshold)
+            .order_by(Sensor.id)
+        )
+        return [(sensor, count) for sensor, count in self.session.execute(stmt).unique()]
 
     def latest_valid_per_sensor(self, device_id: int | None = None) -> Sequence[SensorReading]:
         stmt = (

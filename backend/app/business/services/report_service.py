@@ -710,7 +710,7 @@ class ReportService:
                     r.title,
                     r.priority,
                     r.status,
-                    r.reporter.full_name,
+                    r.reporter.full_name if r.reporter else "Sistema (detección automática)",
                     " · ".join(
                         x
                         for x in (
