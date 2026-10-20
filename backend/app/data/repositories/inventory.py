@@ -45,9 +45,15 @@ class InventoryItemRepository(Repository[InventoryItem]):
         q: str | None = None,
         device_id: int | None = None,
         sensor_id: int | None = None,
+        condition: str | None = None,
+        low_stock_only: bool = False,
     ) -> tuple[Sequence[InventoryItem], int]:
         stmt = select(InventoryItem).order_by(InventoryItem.name)
         filters: list[Any] = []
+        if condition:
+            filters.append(InventoryItem.condition == condition)
+        if low_stock_only:
+            filters.append(InventoryItem.current_stock <= InventoryItem.min_stock)
         if category_id is not None:
             filters.append(InventoryItem.category_id == category_id)
         if is_active is not None:

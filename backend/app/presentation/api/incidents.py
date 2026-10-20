@@ -1,10 +1,11 @@
 """Endpoints de reportes de incidencia (atención mediante mantenimientos) y notificaciones."""
 
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.business.services.incident_service import IncidentService
+from app.business.services.incident_service import IncidentFilters, IncidentService
 from app.business.services.maintenance_service import UsedPart
 from app.business.services.notification_service import NotificationService
 from app.core.permissions import Permission
@@ -23,6 +24,7 @@ from app.presentation.schemas.incidents import (
     NotificationOut,
     NotificationsOut,
     PersonOut,
+    Priority,
 )
 
 router = APIRouter(tags=["Reportes de incidencia"])
@@ -91,10 +93,30 @@ def list_incidents(
     auth: IncidentReader,
     scope: IncidentScope = "mine",
     status_filter: Annotated[IncidentStatus | None, Query(alias="status")] = None,
+    priority: Priority | None = None,
+    device_id: int | None = None,
+    reporter_id: int | None = Query(default=None, description="Solo en la vista de todos los reportes"),
+    responsible_id: int | None = Query(default=None, description="Personal asignado"),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> Page[IncidentOut]:
-    reports, total = IncidentService(db).search(auth.ctx, scope=scope, status=status_filter, offset=offset, limit=limit)
+    reports, total = IncidentService(db).search(
+        auth.ctx,
+        scope=scope,
+        status=status_filter,
+        offset=offset,
+        limit=limit,
+        filters=IncidentFilters(
+            priority=priority,
+            device_id=device_id,
+            reporter_id=reporter_id,
+            responsible_id=responsible_id,
+            date_from=date_from,
+            date_to=date_to,
+        ),
+    )
     return Page(items=[to_incident_out(r) for r in reports], total=total, offset=offset, limit=limit)
 
 

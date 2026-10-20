@@ -58,7 +58,7 @@ function DateRange({ values, set }: FieldProps) {
   return (
     <div className="grid gap-2 sm:col-span-2">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Desde" htmlFor="rf-from" hint="Vacío: 30 días antes de «Hasta»">
+        <Field label="Desde" htmlFor="rf-from" hint="Vacío: sin límite">
           <Input id="rf-from" type="datetime-local" value={values.date_from ?? ''} onChange={(e) => set('date_from', e.target.value)} />
         </Field>
         <Field label="Hasta" htmlFor="rf-to" error={invalid ? 'Debe ser posterior a «Desde»' : undefined} hint="Vacío: ahora">

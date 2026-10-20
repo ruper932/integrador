@@ -118,8 +118,11 @@ _register_catalog("/greenhouses", greenhouse_service, GreenhouseIn, GreenhouseUp
 
 
 @router.get("/devices", response_model=list[DeviceOut])
-def list_devices(db: DbSession, _: Reader, status: DeviceStatus | None = None) -> list[DeviceOut]:
-    return [DeviceOut.model_validate(d) for d in DeviceService(db).list(status=status)]
+def list_devices(
+    db: DbSession, _: Reader, status: DeviceStatus | None = None, fog_collector_id: int | None = None
+) -> list[DeviceOut]:
+    devices = DeviceService(db).list(status=status, fog_collector_id=fog_collector_id)
+    return [DeviceOut.model_validate(d) for d in devices]
 
 
 @router.post("/devices", response_model=DeviceWithKeyOut, status_code=status.HTTP_201_CREATED)

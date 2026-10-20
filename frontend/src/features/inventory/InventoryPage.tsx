@@ -13,7 +13,9 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useHasPermission } from '@/features/auth/useAuth'
 import { PeriodsTab } from '@/features/inventory/PeriodsTab'
-import { ExportReportButton } from '@/features/reports/ExportReportButton'
+import { FilterToolbar } from '@/features/reports/FilterToolbar'
+import { listParams } from '@/features/reports/params'
+import type { FilterValues } from '@/features/reports/ReportFilterField'
 import { api } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import type { InventoryCategory, InventoryItem, InventoryMovement, Page } from '@/types/api'
@@ -231,6 +233,7 @@ const INVENTORY_REPORTS = [
   'inventario_kardex',
   'inventario_consumo',
 ]
+const ITEM_FILTERS = ['category_id', 'condition', 'low_stock_only', 'include_inactive']
 
 export function InventoryPage() {
   const [tab, setTab] = useState<'items' | 'periods'>('items')
@@ -240,7 +243,6 @@ export function InventoryPage() {
         eyebrow="Operaciones"
         title="Inventario IoT"
         description="Componentes, consumibles y herramientas para el hardware IoT y los atrapanieblas."
-        actions={<ExportReportButton kinds={INVENTORY_REPORTS} />}
       />
       <div className="bg-muted mb-5 inline-flex rounded-xl border p-1" role="tablist" aria-label="Secciones del inventario">
         {(
@@ -275,19 +277,16 @@ function ItemsTab() {
   const canManage = can('inventario.gestionar')
   const qc = useQueryClient()
   const [q, setQ] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const [filters, setFilters] = useState<FilterValues>({})
   const [showForm, setShowForm] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const categories = useCategories()
 
   const items = useQuery({
-    queryKey: ['inventory', 'items', q, categoryId],
-    queryFn: async () =>
-      (
-        await api.get<Page<InventoryItem>>('/inventory/items', {
-          params: { q: q || undefined, category_id: categoryId || undefined, limit: 500 },
-        })
-      ).data,
+    queryKey: ['inventory', 'items', q, filters],
+    queryFn: async () => {
+      const params = { ...listParams(ITEM_FILTERS, filters), q: q || undefined, limit: 500 }
+      return (await api.get<Page<InventoryItem>>('/inventory/items', { params })).data
+    },
   })
   const alerts = useQuery({
     queryKey: ['inventory', 'alerts'],
@@ -333,21 +332,11 @@ function ItemsTab() {
         </Card>
       )}
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <FilterToolbar kinds={INVENTORY_REPORTS} keys={ITEM_FILTERS} values={filters} onChange={setFilters}>
         <Field label="Buscar" htmlFor="inv-q">
           <Input id="inv-q" placeholder="Código o nombre" value={q} onChange={(e) => setQ(e.target.value)} />
         </Field>
-        <Field label="Categoría" htmlFor="inv-cat">
-          <NativeSelect id="inv-cat" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">Todas</option>
-            {categories.data?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-      </div>
+      </FilterToolbar>
 
       <ErrorAlert error={items.error ?? deactivate.error} />
       {items.isLoading ? (

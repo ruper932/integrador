@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { KeyRound, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -9,11 +9,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useHasPermission } from '@/features/auth/useAuth'
-import { ExportReportButton } from '@/features/reports/ExportReportButton'
-import { useDevices, useFogCollectors, useSensors, useSensorTypes, useTanks } from '@/features/devices/api'
+import { FilterToolbar } from '@/features/reports/FilterToolbar'
+import { listParams } from '@/features/reports/params'
+import type { FilterValues } from '@/features/reports/ReportFilterField'
+import { useFogCollectors, useSensors, useSensorTypes, useTanks } from '@/features/devices/api'
 import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
-import type { DeviceWithKey } from '@/types/api'
+import type { Device, DeviceWithKey } from '@/types/api'
+
+const LIST_FILTERS = ['device_status', 'fog_collector_id']
 
 const optionalId = (v: string) => (v === '' ? null : Number(v))
 
@@ -169,7 +173,14 @@ export function DevicesPage() {
   const can = useHasPermission()
   const canManage = can('infraestructura.gestionar')
   const qc = useQueryClient()
-  const devices = useDevices()
+  const [filters, setFilters] = useState<FilterValues>({})
+  // Prefijo ['devices']: las invalidaciones existentes también refrescan la lista filtrada.
+  const devices = useQuery({
+    queryKey: ['devices', filters],
+    queryFn: async () =>
+      (await api.get<Device[]>('/devices', { params: listParams(LIST_FILTERS, filters, { device_status: 'status' }) }))
+        .data,
+  })
   const sensors = useSensors()
   const [panel, setPanel] = useState<'device' | 'fog' | null>(null)
   const [sensorFor, setSensorFor] = useState<number | null>(null)
@@ -192,7 +203,6 @@ export function DevicesPage() {
         description="Estaciones ESP32, sus credenciales y los sensores asociados."
         actions={
           <>
-            <ExportReportButton kinds={['dispositivos']} />
             {canManage && (
             <>
               <Button variant="outline" onClick={() => setPanel(panel === 'fog' ? null : 'fog')}>
@@ -230,6 +240,7 @@ export function DevicesPage() {
           </CardContent>
         </Card>
       )}
+      <FilterToolbar kinds={['dispositivos']} keys={LIST_FILTERS} values={filters} onChange={setFilters} />
       <ErrorAlert error={devices.error ?? rotate.error ?? setStatus.error} />
       {devices.isLoading && <Loading />}
 

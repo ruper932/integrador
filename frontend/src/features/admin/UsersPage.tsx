@@ -11,9 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { UserForm } from '@/features/admin/UserForm'
 import { useMe } from '@/features/auth/useAuth'
 import { api } from '@/lib/api'
-import { ExportReportButton } from '@/features/reports/ExportReportButton'
+import { FilterToolbar } from '@/features/reports/FilterToolbar'
+import { listParams } from '@/features/reports/params'
+import type { FilterValues } from '@/features/reports/ReportFilterField'
 import { formatDateTime } from '@/lib/format'
 import type { Page, User, UserWithTemporaryPassword } from '@/types/api'
+
+const LIST_FILTERS = ['role_id', 'position_id', 'is_active']
 
 function ciText(user: User): string {
   const p = user.profile
@@ -25,11 +29,15 @@ export function UsersPage() {
   const qc = useQueryClient()
   const me = useMe()
   const [q, setQ] = useState('')
+  const [filters, setFilters] = useState<FilterValues>({})
   const [mode, setMode] = useState<{ kind: 'create' } | { kind: 'edit'; user: User } | null>(null)
   const [secret, setSecret] = useState<UserWithTemporaryPassword | null>(null)
   const users = useQuery({
-    queryKey: ['users', q],
-    queryFn: async () => (await api.get<Page<User>>('/users', { params: { limit: 200, q: q || undefined } })).data,
+    queryKey: ['users', q, filters],
+    queryFn: async () => {
+      const params = { ...listParams(LIST_FILTERS, filters), limit: 200, q: q || undefined }
+      return (await api.get<Page<User>>('/users', { params })).data
+    },
   })
   const toggle = useMutation({
     mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) => api.put(`/users/${id}`, { is_active }),
@@ -48,7 +56,6 @@ export function UsersPage() {
         description="Las cuentas no se eliminan: se desactivan para conservar la trazabilidad."
         actions={
           <>
-            <ExportReportButton kinds={['usuarios']} />
             <Button onClick={() => setMode({ kind: 'create' })}>
               <Plus /> Usuario
             </Button>
@@ -79,11 +86,11 @@ export function UsersPage() {
           </CardContent>
         </Card>
       )}
-      <div className="mb-4 w-full max-w-sm">
+      <FilterToolbar kinds={['usuarios']} keys={LIST_FILTERS} values={filters} onChange={setFilters}>
         <Field label="Buscar" htmlFor="u-q">
           <Input id="u-q" placeholder="Nombre, apellido, CI o usuario" value={q} onChange={(e) => setQ(e.target.value)} />
         </Field>
-      </div>
+      </FilterToolbar>
       <ErrorAlert error={users.error ?? toggle.error ?? reset.error} />
       {users.isLoading ? (
         <Loading />

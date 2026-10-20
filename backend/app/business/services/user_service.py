@@ -61,8 +61,19 @@ class UserService:
         self.positions = PositionRepository(session)
         self.audit = AuditService(session)
 
-    def list(self, *, offset: int, limit: int, is_active: bool | None, q: str | None) -> tuple[Sequence[User], int]:
-        return self.users.search(offset=offset, limit=limit, is_active=is_active, q=q)
+    def list(
+        self,
+        *,
+        offset: int,
+        limit: int,
+        is_active: bool | None,
+        q: str | None,
+        role_id: int | None = None,
+        position_id: int | None = None,
+    ) -> tuple[Sequence[User], int]:
+        return self.users.search(
+            offset=offset, limit=limit, is_active=is_active, q=q, role_id=role_id, position_id=position_id
+        )
 
     def get(self, user_id: int) -> User:
         user = self.users.get(user_id)

@@ -254,6 +254,12 @@ Lista de tareas realizadas sobre el proyecto, en orden cronológico. Se actualiz
 - [x] Frontend: insignia «Automática» y «Detectado por el sistema» en la lista, el detalle y la línea de tiempo; exportación con autor «Sistema (detección automática)».
 - [x] 4 pruebas de backend (141 en total) y 1 de frontend (23 en total).
 
+### Filtros en la vista principal y exportación directa
+- [x] Cada módulo muestra sus filtros en la propia pantalla (componente `FilterToolbar`): el listado se actualiza con ellos y «Exportar» descarga el reporte elegido con esos filtros y el formato indicado (Excel, PDF o CSV), sin ventana intermedia. Los filtros propios de un reporte (agrupación, periodo de inventario, repuesto del kardex…) aparecen junto al botón al elegirlo; si falta uno obligatorio, el botón queda deshabilitado con aviso.
+- [x] Dashboard: el botón exporta lo que muestra el gráfico (variable, periodo y agrupación). Incidencias: los filtros respetan cada vista (p. ej. «Mis reportes» siempre son los propios).
+- [x] Backend: los listados aceptan los filtros de su reporte — incidencias (prioridad, dispositivo, fechas, autor, responsable), mantenimiento (estado final, responsable, origen), usuarios (rol, cargo), dispositivos (atrapanieblas) y repuestos (estado, solo stock bajo, incluir desactivados).
+- [x] 5 pruebas de backend (146 en total) y 1 de frontend (24 en total); verificado en el navegador (filtro de stock bajo → CSV con el mismo repuesto).
+
 ## Pendiente
 
 - [ ] **Fases 9–11 (ML de producción)** — pendiente por decisión del usuario. La simulación ya probó el flujo. Falta confirmar el horizonte de predicción y las variables de entrada (exigido por `AGENTS.md`) y reunir al menos un año de datos reales. Luego: tablas `ml_models` y `predictions` (migración Alembic), notebook de preparación de datos, entrenamiento con validación temporal, artefacto versionado, servicio de predicción, `POST/GET /api/v1/predictions` y `GET /api/v1/predictions/comparison`, y reporte real vs. estimado.

@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 
-import { ErrorAlert, Loading, NativeSelect, PageHeader, Pagination, StatusBadge } from '@/components/common'
+import { ErrorAlert, Field, Loading, NativeSelect, PageHeader, Pagination, StatusBadge } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -12,25 +12,27 @@ import { IncidentStatusBadge } from '@/features/incidents/IncidentBits'
 import { FINAL_LABELS, MAINTENANCE_STATUS_LABELS, TYPE_LABELS } from '@/features/maintenance/labels'
 import { MaintenanceForm } from '@/features/maintenance/MaintenanceForm'
 import { api } from '@/lib/api'
-import { ExportReportButton } from '@/features/reports/ExportReportButton'
+import { FilterToolbar } from '@/features/reports/FilterToolbar'
+import { listParams } from '@/features/reports/params'
+import type { FilterValues } from '@/features/reports/ReportFilterField'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import type { MaintenanceRecord, MaintenanceStatus, Page } from '@/types/api'
 
 const LIMIT = 25
+const LIST_FILTERS = ['date_range', 'device_id', 'maintenance_type', 'final_status', 'responsible_id', 'origin']
 
 export function MaintenancePage() {
   const can = useHasPermission()
   const [showForm, setShowForm] = useState(false)
   const [offset, setOffset] = useState(0)
   const [status, setStatus] = useState<MaintenanceStatus | ''>('')
+  const [filters, setFilters] = useState<FilterValues>({})
   const records = useQuery({
-    queryKey: ['maintenance', offset, status],
-    queryFn: async () =>
-      (
-        await api.get<Page<MaintenanceRecord>>('/maintenance', {
-          params: { offset, limit: LIMIT, status: status || undefined },
-        })
-      ).data,
+    queryKey: ['maintenance', offset, status, filters],
+    queryFn: async () => {
+      const params = { ...listParams(LIST_FILTERS, filters), offset, limit: LIMIT, status: status || undefined }
+      return (await api.get<Page<MaintenanceRecord>>('/maintenance', { params })).data
+    },
   })
 
   return (
@@ -41,25 +43,6 @@ export function MaintenancePage() {
         description="Mantenimientos y reemplazos de componentes, incluidos los que atienden reportes de incidencia."
         actions={
           <>
-            <ExportReportButton kinds={['mantenimientos', 'inventario_consumo']} />
-            <label className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Estado</span>
-              <NativeSelect
-                value={status}
-                onChange={(e) => {
-                  setStatus(e.target.value as MaintenanceStatus | '')
-                  setOffset(0)
-                }}
-                className="w-36"
-              >
-                <option value="">Todos</option>
-                {(Object.keys(MAINTENANCE_STATUS_LABELS) as MaintenanceStatus[]).map((s) => (
-                  <option key={s} value={s}>
-                    {MAINTENANCE_STATUS_LABELS[s]}
-                  </option>
-                ))}
-              </NativeSelect>
-            </label>
             {can('mantenimiento.registrar') && (
               <Button onClick={() => setShowForm(!showForm)}>
                 <Plus /> Registrar
@@ -75,6 +58,33 @@ export function MaintenancePage() {
           </CardContent>
         </Card>
       )}
+      <FilterToolbar
+        kinds={['mantenimientos', 'inventario_consumo']}
+        keys={LIST_FILTERS}
+        values={filters}
+        onChange={(v) => {
+          setOffset(0)
+          setFilters(v)
+        }}
+      >
+        <Field label="Estado del mantenimiento" htmlFor="m-status">
+          <NativeSelect
+            id="m-status"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as MaintenanceStatus | '')
+              setOffset(0)
+            }}
+          >
+            <option value="">Todos</option>
+            {(Object.keys(MAINTENANCE_STATUS_LABELS) as MaintenanceStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {MAINTENANCE_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+      </FilterToolbar>
       <ErrorAlert error={records.error} />
       {records.isLoading ? (
         <Loading />

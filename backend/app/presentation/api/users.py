@@ -32,10 +32,14 @@ def list_users(
     _: UserAdmin,
     q: str | None = None,
     is_active: bool | None = None,
+    role_id: int | None = None,
+    position_id: int | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> Page[UserOut]:
-    items, total = UserService(db).list(offset=offset, limit=limit, is_active=is_active, q=q)
+    items, total = UserService(db).list(
+        offset=offset, limit=limit, is_active=is_active, q=q, role_id=role_id, position_id=position_id
+    )
     return Page(items=[UserOut.model_validate(u) for u in items], total=total, offset=offset, limit=limit)
 
 

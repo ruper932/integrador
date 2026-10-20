@@ -9,7 +9,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useHasPermission } from '@/features/auth/useAuth'
-import { ExportReportButton } from '@/features/reports/ExportReportButton'
+import { FilterToolbar } from '@/features/reports/FilterToolbar'
+import type { FilterValues } from '@/features/reports/ReportFilterField'
 import { api } from '@/lib/api'
 import { formatCalendarDate, formatDate, formatNumber, relativeTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -394,7 +395,9 @@ export function FogCollectorsPage() {
     queryFn: async () => (await api.get<Overview[]>('/fog-collectors/overview')).data,
     refetchInterval: 60_000,
   })
-  const items = overview.data ?? []
+  const [filters, setFilters] = useState<FilterValues>({})
+  // shortcut: el resumen trae todos los atrapanieblas (pocos); se filtra aquí en vez de en la API.
+  const items = (overview.data ?? []).filter((f) => !filters.fog_collector_id || String(f.id) === filters.fog_collector_id)
   const active = items.filter((f) => f.is_active)
   const select = (id: number) => {
     setSelected(id)
@@ -407,8 +410,8 @@ export function FogCollectorsPage() {
         eyebrow="Operaciones"
         title="Atrapanieblas"
         description="Ubicación, estado según sus estaciones IoT, captación, tanque y mantenimiento de cada atrapanieblas."
-        actions={<ExportReportButton kinds={['dispositivos', 'volumen']} />}
       />
+      <FilterToolbar kinds={['dispositivos', 'volumen']} keys={['fog_collector_id']} values={filters} onChange={setFilters} />
       <ErrorAlert error={overview.error} />
       {overview.isLoading ? (
         <Loading />

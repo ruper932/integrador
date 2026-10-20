@@ -22,7 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useHasPermission } from '@/features/auth/useAuth'
 import { SeriesChart, seriesSummary } from '@/features/dashboard/SeriesChart'
 import { api } from '@/lib/api'
-import { ExportReportButton } from '@/features/reports/ExportReportButton'
+import { ExportControls, useModuleReports } from '@/features/reports/FilterToolbar'
 import { formatDateTime, formatNumber, relativeTime } from '@/lib/format'
 import type { Bucket, DashboardSummary, InventoryItem, LatestValue, Series } from '@/types/api'
 
@@ -88,12 +88,25 @@ function LatestStat({
   )
 }
 
+function chartFilters(variable: string, range: (typeof RANGES)[number]): Record<string, string> {
+  const to = new Date()
+  return {
+    sensor_type: variable,
+    bucket: range.bucket,
+    date_from: new Date(to.getTime() - range.days * 86_400_000).toISOString(),
+    date_to: to.toISOString(),
+  }
+}
+
 export function DashboardPage() {
   const can = useHasPermission()
   const [variable, setVariable] = useState('volumen_captado')
   const [rangeIndex, setRangeIndex] = useState(1)
   const [filter, setFilter] = useState('')
   const range = RANGES[rangeIndex] ?? RANGES[1]!
+  const reports = useModuleReports(['volumen', 'variable'])
+  // El reporte exporta lo que muestra el gráfico: la misma variable, periodo y agrupación.
+  const report = reports.find((r) => r.kind === (variable === 'volumen_captado' ? 'volumen' : 'variable'))
 
   const summary = useQuery({
     queryKey: ['dashboard', 'summary'],
@@ -140,7 +153,6 @@ export function DashboardPage() {
             <strong className="text-foreground font-medium">{relativeTime(data.last_communication_at)}</strong>
           </>
         }
-        actions={<ExportReportButton kinds={['volumen']} />}
       />
 
       {data.has_stale_data && (
@@ -202,6 +214,7 @@ export function DashboardPage() {
                     </option>
                   ))}
                 </NativeSelect>
+                {report && <ExportControls compact report={report} values={chartFilters(variable, range)} />}
               </>
             }
           />

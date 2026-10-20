@@ -9,6 +9,7 @@ El docente recibe un aviso en cada etapa; el administrador y el director ven tod
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 from sqlalchemy.orm import Session
@@ -51,6 +52,18 @@ SCOPE_PERMISSION: dict[Scope, Permission] = {
 
 
 @dataclass(frozen=True)
+class IncidentFilters:
+    """Filtros opcionales de la lista (los mismos que admite el reporte de incidencias)."""
+
+    priority: str | None = None
+    device_id: int | None = None
+    reporter_id: int | None = None
+    responsible_id: int | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+
+
+@dataclass(frozen=True)
 class IncidentSummary:
     """Conteos por estado de los reportes que el usuario puede ver."""
 
@@ -83,18 +96,37 @@ class IncidentService:
     # --- Consulta -------------------------------------------------------------
 
     def search(
-        self, ctx: RequestContext, *, scope: Scope, status: str | None, offset: int, limit: int
+        self,
+        ctx: RequestContext,
+        *,
+        scope: Scope,
+        status: str | None,
+        offset: int,
+        limit: int,
+        filters: IncidentFilters | None = None,
     ) -> tuple[Sequence[IncidentReport], int]:
         user = _require_user(ctx)
         if not _has(user, SCOPE_PERMISSION[scope]):
             raise ForbiddenError("No tiene permiso para consultar estos reportes.")
+        f = filters or IncidentFilters()
+        common = {
+            "offset": offset,
+            "limit": limit,
+            "priority": f.priority,
+            "device_id": f.device_id,
+            "date_from": f.date_from,
+            "date_to": f.date_to,
+        }
+        # Cada vista fija lo que la define; los filtros de persona solo se aplican donde no la contradicen.
         if scope == "mine":
-            return self.reports.search(offset=offset, limit=limit, reported_by_id=user.id, status=status)
+            return self.reports.search(**common, reported_by_id=user.id, assigned_to_id=f.responsible_id, status=status)
         if scope == "open":
-            return self.reports.search(offset=offset, limit=limit, status=INCIDENT_OPEN, priority_first=True)
+            return self.reports.search(**common, status=INCIDENT_OPEN, priority_first=True)
         if scope == "assigned":
-            return self.reports.search(offset=offset, limit=limit, assigned_to_id=user.id, status=status)
-        return self.reports.search(offset=offset, limit=limit, status=status)
+            return self.reports.search(**common, assigned_to_id=user.id, status=status)
+        return self.reports.search(
+            **common, reported_by_id=f.reporter_id, assigned_to_id=f.responsible_id, status=status
+        )
 
     def get(self, ctx: RequestContext, report_id: int) -> IncidentReport:
         user = _require_user(ctx)

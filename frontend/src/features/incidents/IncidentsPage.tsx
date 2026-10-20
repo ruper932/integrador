@@ -20,12 +20,23 @@ import { PRIORITY_LABELS, STATUS_LABELS, STATUS_ORDER } from '@/features/inciden
 import { FINAL_LABELS, TYPE_LABELS } from '@/features/maintenance/labels'
 import { MaintenanceForm } from '@/features/maintenance/MaintenanceForm'
 import { api } from '@/lib/api'
-import { ExportReportButton } from '@/features/reports/ExportReportButton'
+import { FilterToolbar } from '@/features/reports/FilterToolbar'
+import { listParams } from '@/features/reports/params'
+import type { FilterValues } from '@/features/reports/ReportFilterField'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Incident, IncidentScope, IncidentStatus, IncidentSummary, Page } from '@/types/api'
 
 const LIMIT = 20
+// Filtros de la lista según la vista: cada vista fija lo que la define (p. ej. «Por atender» solo
+// muestra abiertos y «Mis reportes» solo los propios).
+const BASE_FILTERS = ['date_range', 'priority', 'device_id']
+const SCOPE_FILTERS: Record<IncidentScope, string[]> = {
+  mine: [...BASE_FILTERS, 'incident_status', 'responsible_id'],
+  open: BASE_FILTERS,
+  assigned: [...BASE_FILTERS, 'incident_status'],
+  all: [...BASE_FILTERS, 'incident_status', 'reporter_id', 'responsible_id'],
+}
 const PRIORITIES = ['alta', 'media', 'baja'] as const
 // Mismo significado de color en toda la app: rosa abierto, lavanda aceptado, durazno en curso, menta finalizado.
 const STATUS_COLOR: Record<IncidentStatus, ToneColor> = {
@@ -352,19 +363,17 @@ export function IncidentsPage() {
   const [params, setParams] = useSearchParams()
   const tabs = TABS.filter((t) => can(t.permission))
   const [scope, setScope] = useState<IncidentScope>(tabs[0]?.scope ?? 'mine')
-  const [status, setStatus] = useState<IncidentStatus | ''>('')
+  const [filters, setFilters] = useState<FilterValues>({})
   const [offset, setOffset] = useState(0)
   const [showForm, setShowForm] = useState(false)
   const [sent, setSent] = useState<Incident | null>(null)
   const summary = useIncidentSummary()
   const list = useQuery({
-    queryKey: ['incidents', 'list', scope, status, offset],
-    queryFn: async () =>
-      (
-        await api.get<Page<Incident>>('/incidents', {
-          params: { scope, status: scope === 'open' ? undefined : status || undefined, offset, limit: LIMIT },
-        })
-      ).data,
+    queryKey: ['incidents', 'list', scope, filters, offset],
+    queryFn: async () => {
+      const own = listParams(SCOPE_FILTERS[scope], filters, { incident_status: 'status' })
+      return (await api.get<Page<Incident>>('/incidents', { params: { ...own, scope, offset, limit: LIMIT } })).data
+    },
     refetchInterval: 60_000,
   })
   const selected = Number(params.get('reporte')) || null
@@ -383,7 +392,6 @@ export function IncidentsPage() {
         }
         actions={
           <>
-          <ExportReportButton kinds={['incidencias']} />
           {can('incidencias.reportar') && (
             <Button
               onClick={() => {
@@ -446,27 +454,16 @@ export function IncidentsPage() {
             </button>
           ))}
         </div>
-        {scope !== 'open' && (
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Estado</span>
-            <NativeSelect
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value as IncidentStatus | '')
-                setOffset(0)
-              }}
-              className="w-40"
-            >
-              <option value="">Todos</option>
-              {STATUS_ORDER.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
-        )}
       </div>
+      <FilterToolbar
+        kinds={['incidencias']}
+        keys={SCOPE_FILTERS[scope]}
+        values={filters}
+        onChange={(v) => {
+          setFilters(v)
+          setOffset(0)
+        }}
+      />
 
       <ErrorAlert error={list.error} />
       {list.isLoading ? (

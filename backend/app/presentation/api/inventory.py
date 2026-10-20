@@ -19,6 +19,8 @@ from app.presentation.schemas.inventory import (
     CategoryIn,
     CategoryOut,
     CountsIn,
+    FinalStatus,
+    ItemCondition,
     ItemIn,
     ItemOut,
     ItemSummaryOut,
@@ -126,6 +128,9 @@ def list_items(
     is_active: bool | None = True,
     device_id: int | None = Query(default=None, description="Repuestos compatibles con el dispositivo"),
     sensor_id: int | None = Query(default=None, description="Repuestos compatibles con el sensor"),
+    condition: ItemCondition | None = None,
+    low_stock_only: bool = False,
+    include_inactive: bool = Query(default=False, description="Incluye los desactivados (ignora is_active)"),
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> Page[ItemOut]:
@@ -134,9 +139,11 @@ def list_items(
         limit=limit,
         q=q,
         category_id=category_id,
-        is_active=is_active,
+        is_active=None if include_inactive else is_active,
         device_id=device_id,
         sensor_id=sensor_id,
+        condition=condition,
+        low_stock_only=low_stock_only,
     )
     return Page(items=[ItemOut.model_validate(i) for i in items], total=total, offset=offset, limit=limit)
 
@@ -384,6 +391,11 @@ def list_maintenance(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     status: MaintenanceStatus | None = None,
+    final_status: FinalStatus | None = None,
+    responsible_id: int | None = None,
+    origin: Literal["incidencia", "directo"] | None = Query(
+        default=None, description="incidencia: atención de un reporte; directo: registro directo"
+    ),
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
 ) -> Page[MaintenanceOut]:
@@ -396,6 +408,9 @@ def list_maintenance(
         date_from=date_from,
         date_to=date_to,
         status=status,
+        final_status=final_status,
+        user_id=responsible_id,
+        from_incident=None if origin is None else origin == "incidencia",
     )
     return Page(items=[to_maintenance_out(r) for r in records], total=total, offset=offset, limit=limit)
 

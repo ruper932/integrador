@@ -63,8 +63,8 @@ class DeviceService:
         self.fog_collectors = FogCollectorRepository(session)
         self.audit = AuditService(session)
 
-    def list(self, *, status: str | None = None) -> Sequence[Device]:
-        return self.devices.list(limit=1000, status=status, order_by=Device.code)
+    def list(self, *, status: str | None = None, fog_collector_id: int | None = None) -> Sequence[Device]:
+        return self.devices.list(limit=1000, status=status, fog_collector_id=fog_collector_id, order_by=Device.code)
 
     def get(self, device_id: int) -> Device:
         device = self.devices.get(device_id)
