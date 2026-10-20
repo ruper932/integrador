@@ -1,4 +1,17 @@
 # Visual — Style Reference
+
+> **Vigente desde 2026-10-20: estilo pastel sobrio.** Esta sección manda sobre todo lo que sigue.
+> Los valores exactos viven en `frontend/src/index.css` (`:root` y `.dark`); no escribir colores hex en componentes.
+>
+> - **Paleta:** fondo `#f6f8fc`, tarjetas `#ffffff`, texto `#1f2937`, texto secundario `#5b6577`, bordes `#e2e7f0`.
+>   Acción principal en azul pastel `#b9d1f5` con texto `#183357`. Estados: menta (éxito), durazno (advertencia), rosa (error),
+>   siempre con icono y texto. Gráficos: real `#5b8def` vs. estimado `#c97a2e`.
+> - **Tipografía:** sans del sistema para toda la interfaz; mono solo para códigos/claves. Títulos `font-semibold`, sin
+>   tracking negativo, sin mayúsculas sostenidas. Título de página 24–28 px.
+> - **Forma:** radios 6 px (controles) y 12 px (tarjetas); sombra muy suave solo en tarjetas.
+> - **Descartado del estilo anterior:** serif de póster, monoespaciada en la UI, amarillo resaltador y barras decorativas.
+>
+> El resto del documento describe el estilo editorial original y se conserva como referencia de espaciado y estructura.
 > Warm editorial zine. Cream paper, serif posters, mono marginalia, a single yellow highlighter mark.
 
 **Theme:** light

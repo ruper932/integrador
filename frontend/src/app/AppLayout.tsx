@@ -284,7 +284,7 @@ function Shell({
         {groups.map((g) => (
           <nav key={g.label} aria-label={g.label} className="mb-1">
             {showLabels ? (
-              <div className="text-muted-foreground mx-3 mt-4 mb-2 text-[10px] font-semibold tracking-[0.15em] uppercase">
+              <div className="text-muted-foreground mx-3 mt-4 mb-2 text-xs font-medium">
                 {g.label}
               </div>
             ) : (

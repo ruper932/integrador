@@ -62,7 +62,7 @@ function ExportDialog({ reports, onClose }: { reports: ReportDefinition[]; onClo
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <div className="text-[11px] font-semibold tracking-[0.12em] uppercase">{report.module}</div>
+          <div className="text-muted-foreground text-xs font-medium">{report.module}</div>
           <DialogTitle className="text-lg">Exportar reporte</DialogTitle>
           <DialogDescription>Se genera en el servidor local con los filtros indicados.</DialogDescription>
         </DialogHeader>

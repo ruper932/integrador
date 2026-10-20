@@ -35,16 +35,9 @@ export function PageHeader({
     <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
       <div className="min-w-0">
         {eyebrow && (
-          <div className="text-muted-foreground mb-2 flex items-center gap-2 text-xs font-medium uppercase">
-            {/* Marca editorial de DESIGN.md: trazo negro + trazo amarillo. */}
-            <span aria-hidden className="flex flex-col gap-0.5">
-              <span className="bg-foreground block h-0.5 w-6" />
-              <span className="bg-highlight block h-1 w-10" />
-            </span>
-            {eyebrow}
-          </div>
+          <div className="text-muted-foreground mb-1 text-xs font-medium">{eyebrow}</div>
         )}
-        <h1 className="font-heading text-[34px] leading-[1.05] font-light tracking-[-0.05em] md:text-[44px]">{title}</h1>
+        <h1 className="font-heading text-2xl leading-tight font-semibold md:text-[28px]">{title}</h1>
         {description && <p className="text-muted-foreground mt-1 max-w-3xl text-sm">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
@@ -156,9 +149,9 @@ export function StatCard({
           </span>
         )}
       </div>
-      <div className="font-heading my-2 text-[30px] leading-none font-light tracking-[-0.04em] tabular-nums sm:text-[34px]">
+      <div className="font-heading my-2 text-2xl leading-none font-semibold tabular-nums sm:text-[28px]">
         {value}
-        {unit && <span className="text-muted-foreground ml-1 text-sm font-normal tracking-normal">{unit}</span>}
+        {unit && <span className="text-muted-foreground ml-1 text-sm font-normal">{unit}</span>}
       </div>
       {foot && (
         <div
