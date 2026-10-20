@@ -7,8 +7,16 @@ import { BarChart3 } from 'lucide-react'
 
 // Colores tomados del tema (claro/oscuro) mediante variables CSS.
 // Una sola serie por gráfico (el título la nombra) y un único eje Y. Sin animaciones:
-// los equipos de la institución pueden ser modestos.
-const SERIES = 'var(--chart-1)'
+// los equipos de la institución pueden ser modestos. Cada variable tiene su color para
+// reconocerla de un vistazo; las no listadas usan el azul del agua.
+const SERIES_COLOR: Record<string, string> = {
+  temperatura: 'var(--chart-3)',
+  humedad_relativa: 'var(--chart-2)',
+  presion_atmosferica: 'var(--chart-4)',
+  velocidad_viento: 'var(--chart-5)',
+  direccion_viento: 'var(--chart-5)',
+  niebla: 'var(--chart-4)',
+}
 const GRID = 'var(--grid)'
 const AXIS = 'var(--muted-foreground)'
 
@@ -35,6 +43,7 @@ export function seriesSummary(series: Series): { value: number | null; suffix: s
 
 export function SeriesChart({ series }: { series: Series }) {
   const unit = series.sensor_type.unit
+  const SERIES = SERIES_COLOR[series.sensor_type.code] ?? 'var(--chart-1)'
   const incremental = series.aggregation === 'incremental'
   const data = series.points.map((p) => ({ x: label(p.bucket, series.bucket), value: p.value, count: p.count }))
 
