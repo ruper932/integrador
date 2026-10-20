@@ -1,0 +1,76 @@
+# Despliegue local institucional: docker compose up -d --build
+# Solo Nginx publica un puerto; la API y PostgreSQL quedan en la red interna.
+
+name: atrapanieblas
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-atrapanieblas}
+      POSTGRES_USER: ${POSTGRES_USER:-atrapanieblas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-atrapanieblas}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-atrapanieblas}
+      SECRET_KEY: ${SECRET_KEY:?Defina SECRET_KEY en .env}
+      SESSION_TTL_MINUTES: ${SESSION_TTL_MINUTES:-480}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY_HEADERS: "true"
+      CORS_ORIGINS: '[]'
+      LOCAL_TIMEZONE: America/La_Paz
+    volumes:
+      - ./backend/artifacts:/app/artifacts:ro
+    networks: [internal]
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./deployment/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [internal]
+
+  # Respaldo diario de PostgreSQL en ./backups (fuera del contenedor de la base de datos).
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-atrapanieblas}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-atrapanieblas}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ./backups:/backups
+      - ./deployment/scripts/backup-loop.sh:/backup-loop.sh:ro
+    entrypoint: ["sh", "/backup-loop.sh"]
+    networks: [internal]
+
+volumes:
+  pgdata:
+
+networks:
+  internal:

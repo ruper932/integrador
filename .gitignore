@@ -1,0 +1,34 @@
+# Secretos y configuración local
+.env
+*.env.local
+!.env.example
+
+# Python
+backend/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+
+# Firmware
+firmware/.pio/
+
+# Respaldos de la base de datos (se guardan fuera del repositorio)
+backups/
+
+# Artefactos ML: se versionan explícitamente cuando exista el modelo aprobado
+backend/artifacts/*
+!backend/artifacts/.gitkeep
+
+# Machine learning (entorno y salidas regenerables de la simulación)
+notebooks/.venv/
+notebooks/simulacion/salidas/
+
+# Registros de iniciar.sh
+logs/
