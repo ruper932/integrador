@@ -15,33 +15,27 @@ export function AuthShell({ title, description, children }: { title: string; des
   const { theme, toggle } = useTheme()
   return (
     <div className="bg-background grid min-h-svh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      {/* Panel oscuro fijo en carbón (también en modo oscuro), plano y sin degradados. */}
-      <aside className="relative hidden overflow-hidden bg-[#2c2c26] p-12 text-[#ffffff] lg:flex lg:flex-col">
+      {/* Panel lateral pastel claro, plano y sin degradados. */}
+      <aside className="bg-accent text-accent-foreground relative hidden overflow-hidden p-12 lg:flex lg:flex-col">
         <div className="relative flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-[3px] bg-[#fff347] text-[#2c2c26]">
+          <span className="bg-primary text-primary-foreground grid size-11 place-items-center rounded-xl">
             <Droplets className="size-6" aria-hidden />
           </span>
           <span>
-            <strong className="block text-xl tracking-[0.14em]">ATINA</strong>
+            <strong className="block text-xl">ATINA</strong>
             <small className="block text-xs opacity-75">Gestión hídrica · C.E.A.</small>
           </span>
         </div>
         <div className="relative mt-auto max-w-md">
-          <div className="mb-4 flex items-center gap-3 text-xs font-medium text-[#979886] uppercase">
-            <span aria-hidden className="flex flex-col gap-0.5">
-              <span className="block h-0.5 w-8 bg-[#ffffff]" />
-              <span className="block h-1 w-14 bg-[#fff347]" />
-            </span>
-            Monitoreo de atrapanieblas
-          </div>
-          <h2 className="font-heading text-[64px] leading-[0.94] font-light tracking-[-0.05em]">El agua, en perspectiva.</h2>
+          <p className="mb-4 text-xs font-medium">Monitoreo de atrapanieblas</p>
+          <h2 className="font-heading text-4xl leading-tight font-semibold">El agua, en perspectiva.</h2>
           <p className="mt-3 text-sm opacity-80">
             Centro de Educación Alternativa “Ildefonso de las Muñecas” — Titicachi, Chuma, La Paz.
           </p>
           <ul className="mt-8 grid gap-3">
             {POINTS.map(({ icon: Icon, text }) => (
               <li key={text} className="flex items-start gap-3 text-sm opacity-90">
-                <Icon className="mt-0.5 size-4 shrink-0 text-[#aaab9c]" aria-hidden />
+                <Icon className="text-accent-foreground mt-0.5 size-4 shrink-0" aria-hidden />
                 {text}
               </li>
             ))}
@@ -62,15 +56,15 @@ export function AuthShell({ title, description, children }: { title: string; des
         </Button>
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="bg-accent text-foreground grid size-10 place-items-center rounded-xl">
+            <span className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-xl">
               <Droplets className="size-5" aria-hidden />
             </span>
             <span>
-              <strong className="block tracking-[0.12em]">ATINA</strong>
+              <strong className="block">ATINA</strong>
               <small className="text-muted-foreground block text-xs">Gestión hídrica · C.E.A.</small>
             </span>
           </div>
-          <h1 className="font-heading text-[36px] leading-[1.05] font-light tracking-[-0.05em]">{title}</h1>
+          <h1 className="font-heading text-2xl font-semibold">{title}</h1>
           <p className="text-muted-foreground mt-1.5 mb-7 text-sm">{description}</p>
           {children}
         </div>
