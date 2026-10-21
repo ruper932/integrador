@@ -6,8 +6,8 @@ de volumen basada en machine learning.
 Caso de estudio: Centro de Educación Alternativa “Ildefonso de las Muñecas”, Titicachi, Chuma, La Paz, Bolivia.
 
 Funciona en la red local institucional, sin depender de Internet. El alcance y las reglas del
-proyecto están en [AGENTS.md](AGENTS.md); el avance, en [tareas.md](tareas.md); las decisiones
-técnicas, en [docs/decisiones.md](docs/decisiones.md).
+proyecto están en [AGENTS.md](AGENTS.md); el avance, en [tareas.md](tareas.md); la arquitectura,
+en [docs/arquitectura.md](docs/arquitectura.md); las decisiones técnicas, en [docs/decisiones.md](docs/decisiones.md).
 
 ## Estructura
 
