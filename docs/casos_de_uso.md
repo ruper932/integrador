@@ -11,9 +11,9 @@ error principal de cada caso; los demás flujos alternativos se describen en est
 | Proceso | Casos de uso | Páginas del archivo |
 |---------|--------------|---------------------|
 | Reportes de incidencia | CU-01 a CU-06 | «CU-01 · Casos de uso», «CU-01 · Secuencia», … «CU-06 · Secuencia» |
-| Recuperación de cuenta | CU-07 a CU-09 | «Recuperación · Casos de uso», «Recuperación · Secuencia» |
+| Recuperación de cuenta | CU-07 a CU-09 | «Recuperación · Casos de uso», «CU-07 · Secuencia», «CU-08 · Secuencia», «CU-09 · Secuencia» |
 | Mantenimiento con repuestos | CU-10 | «Mantenimiento · Casos de uso», «Mantenimiento · Secuencia» |
-| Periodo de inventario | CU-11 a CU-14 | «Periodo de inventario · Casos de uso», «Periodo de inventario · Secuencia» |
+| Periodo de inventario | CU-11 a CU-14 | «Periodo de inventario · Casos de uso», «CU-11 · Secuencia», «CU-12 · Secuencia», «CU-13 · Secuencia» |
 
 ## Actores
 
