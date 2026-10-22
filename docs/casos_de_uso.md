@@ -4,6 +4,10 @@ Especificación de los procesos del sistema en los que intervienen varios roles.
 tiene su diagrama de casos de uso y su diagrama de secuencia en
 [diagramas/procesos.drawio](diagramas/procesos.drawio), una página por diagrama.
 
+Los diagramas de secuencia muestran tres componentes: la **interfaz web**, el **controlador**
+(que agrupa la API y la lógica de negocio del módulo) y la **base de datos**. Solo representan el
+error principal de cada caso; los demás flujos alternativos se describen en este documento.
+
 | Proceso | Casos de uso | Páginas del archivo |
 |---------|--------------|---------------------|
 | Reportes de incidencia | CU-01 a CU-06 | «CU-01 · Casos de uso», «CU-01 · Secuencia», … «CU-06 · Secuencia» |
