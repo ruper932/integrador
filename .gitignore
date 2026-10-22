@@ -32,3 +32,6 @@ notebooks/simulacion/salidas/
 
 # Registros de iniciar.sh
 logs/
+
+# Respaldos temporales de draw.io Desktop
+*.drawio.bkp
