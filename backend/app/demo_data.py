@@ -14,7 +14,9 @@ Uso: python -m app.cli seed-demo
 """
 
 import math
+import os
 import random
+import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -53,7 +55,10 @@ from app.data.repositories.people import AcademicLevelRepository, InstitutionRep
 from app.data.repositories.relocations import RelocationRepository
 from app.data.repositories.security import RoleRepository, UserRepository
 
-DEMO_PASSWORD = "Atina-Demo-2026"  # noqa: S105 - solo para cuentas de demostración
+# Contraseña de las cuentas de demostración: la de DEMO_PASSWORD (para repetir demostraciones) o una
+# aleatoria en cada carga, que `seed-demo` muestra una sola vez. Nunca una fija en el código.
+# El sufijo numérico garantiza la política (letras y al menos un número).
+DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD") or f"Demo-{secrets.token_urlsafe(9)}-{secrets.randbelow(900) + 100}"
 MARKER_DEVICE = "esp32-01"
 READING_DAYS = 30
 SEED = 2026

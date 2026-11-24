@@ -1,7 +1,12 @@
 # Secretos y configuración local
 .env
+.env.*
 *.env.local
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Python
 backend/.venv/
@@ -21,6 +26,8 @@ firmware/.pio/
 
 # Respaldos de la base de datos (se guardan fuera del repositorio)
 backups/
+*.dump
+*.sql.gz
 
 # Artefactos ML: se versionan explícitamente cuando exista el modelo aprobado
 backend/artifacts/*
@@ -43,4 +50,12 @@ deployment/certs/
 docs/Documentos/
 
 # Configuración local de Claude Code (propia de cada equipo)
-.claude/settings.local.json
+.claude/
+
+# Sistema operativo, editores y registros sueltos
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+.ipynb_checkpoints/
