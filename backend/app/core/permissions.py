@@ -27,6 +27,10 @@ class Permission(StrEnum):
     INCIDENTS_REPORT = "incidencias.reportar"
     INCIDENTS_ATTEND = "incidencias.atender"
     INCIDENTS_SUPERVISE = "incidencias.supervisar"
+    RELOCATIONS_REQUEST = "reubicaciones.solicitar"
+    RELOCATIONS_ATTEND = "reubicaciones.atender"
+    RELOCATIONS_SUPERVISE = "reubicaciones.supervisar"
+    FIRMWARE_MANAGE = "firmware.gestionar"
     BACKUPS_MANAGE = "respaldos.gestionar"
     SETTINGS_MANAGE = "configuracion.gestionar"
 
@@ -51,6 +55,10 @@ PERMISSION_DESCRIPTIONS: dict[Permission, str] = {
     Permission.INCIDENTS_REPORT: "Reportar incidencias y seguir el estado de los propios reportes",
     Permission.INCIDENTS_ATTEND: "Recibir, aceptar y atender reportes de incidencia",
     Permission.INCIDENTS_SUPERVISE: "Consultar todos los reportes de incidencia y su seguimiento",
+    Permission.RELOCATIONS_REQUEST: "Solicitar la reubicación de un atrapanieblas y seguir la solicitud",
+    Permission.RELOCATIONS_ATTEND: "Aceptar, ejecutar y finalizar o rechazar reubicaciones de atrapanieblas",
+    Permission.RELOCATIONS_SUPERVISE: "Consultar todas las solicitudes de reubicación",
+    Permission.FIRMWARE_MANAGE: "Cargar versiones de firmware y asignarlas a las estaciones ESP32",
     Permission.BACKUPS_MANAGE: "Gestionar respaldos",
     Permission.SETTINGS_MANAGE: "Acceder a la configuración técnica",
 }

@@ -1,9 +1,9 @@
 """Endpoints administrativos: recuperación de cuenta y auditoría."""
 
-from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import AwareDatetime
 
 from app.business.services.audit_service import AuditService
 from app.business.services.recovery_service import RecoveryService
@@ -70,8 +70,8 @@ def list_audit_logs(
     user_id: int | None = None,
     action: str | None = None,
     entity_type: str | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: AwareDatetime | None = None,
+    date_to: AwareDatetime | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> Page[AuditLogOut]:

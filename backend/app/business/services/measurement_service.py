@@ -7,14 +7,21 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from app.business.rules.connection import is_stale
 from app.core.clock import utcnow
 from app.core.config import get_settings
 from app.core.errors import BusinessRuleError, NotFoundError
 from app.data.models.iot import Device, SensorReading, SensorType
-from app.data.repositories.iot import DeviceRepository, SensorReadingRepository, SensorTypeRepository
+from app.data.repositories.iot import (
+    DeviceRepository,
+    SensorReadingRepository,
+    SensorRepository,
+    SensorTypeRepository,
+)
 
 VOLUME_TYPE_CODE = "volumen_captado"
 MAX_SERIES_POINTS = 5000
+LIVE_MAX_MINUTES = 360  # 6 h a 5 s son 4320 puntos por variable: suficiente para el panel en vivo
 
 
 @dataclass(frozen=True)
@@ -65,6 +72,39 @@ class Series:
     points: list[SeriesPoint]
 
 
+@dataclass(frozen=True)
+class LiveVariable:
+    sensor_type: SensorType
+    points: list[tuple[datetime, float]]
+    latest_value: float | None
+    latest_at: datetime | None
+
+    def _values(self) -> list[float]:
+        return [v for _, v in self.points]
+
+    @property
+    def minimum(self) -> float | None:
+        return min(self._values(), default=None)
+
+    @property
+    def maximum(self) -> float | None:
+        return max(self._values(), default=None)
+
+    @property
+    def average(self) -> float | None:
+        values = self._values()
+        return sum(values) / len(values) if values else None
+
+
+@dataclass(frozen=True)
+class LiveSnapshot:
+    generated_at: datetime
+    window_minutes: int
+    device: Device
+    is_stale: bool
+    variables: list[LiveVariable]
+
+
 _BUCKET_SIZES = {
     "hour": timedelta(hours=1),
     "day": timedelta(days=1),
@@ -79,6 +119,7 @@ class MeasurementService:
         self.readings = SensorReadingRepository(session)
         self.devices = DeviceRepository(session)
         self.sensor_types = SensorTypeRepository(session)
+        self.sensors = SensorRepository(session)
         self.settings = get_settings()
         self.tz = ZoneInfo(self.settings.local_timezone)
 
@@ -88,8 +129,53 @@ class MeasurementService:
             raise BusinessRuleError("La fecha inicial debe ser anterior a la final.", code="rango_invalido")
         return self.readings.search(**filters)  # type: ignore[arg-type]
 
-    def _is_stale(self, ts: datetime | None, now: datetime) -> bool:
-        return ts is None or now - ts > timedelta(minutes=self.settings.device_stale_minutes)
+    @staticmethod
+    def _is_stale(ts: datetime | None, device: Device, now: datetime) -> bool:
+        return is_stale(ts, device.sample_interval_s, now)
+
+    def live(self, device_id: int, minutes: int) -> LiveSnapshot:
+        """Lecturas válidas recientes de una estación, por variable, para el panel de monitoreo en vivo.
+
+        El último valor se toma aunque sea anterior a la ventana (el panel lo marca como desactualizado);
+        las variables de los sensores inactivos no se muestran.
+        """
+        if not 1 <= minutes <= LIVE_MAX_MINUTES:
+            raise BusinessRuleError(
+                f"La ventana debe estar entre 1 y {LIVE_MAX_MINUTES} minutos.", code="ventana_invalida"
+            )
+        device = self.devices.get(device_id)
+        if device is None:
+            raise NotFoundError("Dispositivo no encontrado.")
+        now = utcnow()
+        sensors = [s for s in self.sensors.list_by_device(device_id) if s.status == "activo"]
+        types: dict[int, SensorType] = {}
+        for sensor in sorted(sensors, key=lambda s: s.sensor_type.code):
+            types.setdefault(sensor.sensor_type_id, sensor.sensor_type)
+        points: dict[int, list[tuple[datetime, float]]] = {type_id: [] for type_id in types}
+        for type_id, measured_at, value in self.readings.valid_points(device_id, now - timedelta(minutes=minutes), now):
+            if type_id in points:
+                points[type_id].append((measured_at, value))
+        latest: dict[int, SensorReading] = {}
+        for reading in self.readings.latest_valid_per_sensor(device_id):
+            current = latest.get(reading.sensor_type_id)
+            if current is None or reading.measured_at > current.measured_at:
+                latest[reading.sensor_type_id] = reading
+        variables = [
+            LiveVariable(
+                sensor_type=sensor_type,
+                points=points[type_id],
+                latest_value=float(latest[type_id].value) if type_id in latest else None,
+                latest_at=latest[type_id].measured_at if type_id in latest else None,
+            )
+            for type_id, sensor_type in types.items()
+        ]
+        return LiveSnapshot(
+            generated_at=now,
+            window_minutes=minutes,
+            device=device,
+            is_stale=self._is_stale(device.last_seen_at, device, now),
+            variables=variables,
+        )
 
     def summary(self) -> DashboardSummary:
         now = utcnow()
@@ -97,16 +183,16 @@ class MeasurementService:
         statuses = [
             DeviceStatus(
                 device=d,
-                is_stale=self._is_stale(d.last_seen_at, now),
+                is_stale=self._is_stale(d.last_seen_at, d, now),
                 minutes_since_last_seen=int((now - d.last_seen_at).total_seconds() // 60) if d.last_seen_at else None,
             )
             for d in devices
         ]
-        active_ids = {d.id for d in devices}
+        by_id = {d.id: d for d in devices}
         latest = [
-            LatestValue(reading=r, is_stale=self._is_stale(r.measured_at, now))
+            LatestValue(reading=r, is_stale=self._is_stale(r.measured_at, by_id[r.device_id], now))
             for r in self.readings.latest_valid_per_sensor()
-            if r.device_id in active_ids and r.sensor.status == "activo"
+            if r.device_id in by_id and r.sensor.status == "activo"
         ]
         last_comm = max((d.last_seen_at for d in devices if d.last_seen_at), default=None)
         return DashboardSummary(

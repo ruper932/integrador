@@ -7,9 +7,9 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.business.rules.connection import is_stale
 from app.business.services.measurement_service import VOLUME_TYPE_CODE, MeasurementService
 from app.core.clock import utcnow
-from app.core.config import get_settings
 from app.data.models.inventory import MAINTENANCE_FINISHED
 from app.data.repositories.incidents import IncidentReportRepository
 from app.data.repositories.inventory import MaintenanceRecordRepository
@@ -20,6 +20,7 @@ from app.data.repositories.iot import (
     SensorRepository,
     TankRepository,
 )
+from app.data.repositories.relocations import RelocationRepository
 
 TANK_LEVEL_CODE = "nivel_almacenamiento"
 
@@ -46,8 +47,8 @@ class FogCollectorOverviewService:
         self.readings = SensorReadingRepository(session)
         self.incidents = IncidentReportRepository(session)
         self.maintenance = MaintenanceRecordRepository(session)
+        self.relocations = RelocationRepository(session)
         self.measurements = MeasurementService(session)
-        self.stale_after = timedelta(minutes=get_settings().device_stale_minutes)
 
     def overview(self) -> list[dict[str, Any]]:
         now = utcnow()
@@ -62,7 +63,7 @@ class FogCollectorOverviewService:
                 "name": d.name,
                 "status": d.status,
                 "last_seen_at": d.last_seen_at,
-                "is_stale": d.last_seen_at is None or now - d.last_seen_at > self.stale_after,
+                "is_stale": is_stale(d.last_seen_at, d.sample_interval_s, now),
             }
             for d in self.devices.list(limit=100, fog_collector_id=fc.id)
         ]
@@ -105,6 +106,7 @@ class FogCollectorOverviewService:
         daily = [{"date": p.bucket, "value": p.value} for p in series.points if p.value is not None]
         week = sum(p["value"] for p in daily)
         area = float(fc.mesh_area_m2) if fc.mesh_area_m2 else None
+        relocation = self.relocations.active_for(fc.id)
         location = fc.location
         return {
             "id": fc.id,
@@ -137,4 +139,6 @@ class FogCollectorOverviewService:
             "daily": daily,
             "open_incidents": open_incidents,
             "last_maintenance_at": last_maintenance,
+            # Solicitud de reubicación en curso: el formulario no permite abrir otra mientras exista.
+            "active_relocation": None if relocation is None else {"id": relocation.id, "status": relocation.status},
         }

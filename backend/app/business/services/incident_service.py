@@ -73,6 +73,15 @@ class IncidentSummary:
     all: dict[str, int] | None
 
 
+@dataclass(frozen=True)
+class IncidentAlerts:
+    """Reportes abiertos de los que se avisó al usuario: los de prioridad alta sin revisar bloquean
+    la interfaz; los de prioridad media se le recuerdan hasta que alguien acepta el reporte."""
+
+    blocking: Sequence[IncidentReport]
+    reminders: Sequence[IncidentReport]
+
+
 def _has(user: User, permission: Permission) -> bool:
     return permission.value in user.permission_codes
 
@@ -155,6 +164,27 @@ class IncidentService:
             else None,
             all=self.reports.count_by_status() if _has(user, Permission.INCIDENTS_SUPERVISE) else None,
         )
+
+    def alerts(self, ctx: RequestContext) -> IncidentAlerts:
+        user = _require_user(ctx)
+        return IncidentAlerts(
+            blocking=self.reports.notified_open(user.id, priority="alta", unread_only=True),
+            reminders=self.reports.notified_open(user.id, priority="media", unread_only=False),
+        )
+
+    def review_alert(self, ctx: RequestContext, report_id: int) -> None:
+        """El usuario confirma que revisó la alerta: sus avisos sobre el reporte quedan leídos."""
+        user = _require_user(ctx)
+        report = self.get(ctx, report_id)
+        if self.notifications.mark_incident_read(user.id, report.id):
+            self.audit.record(
+                ctx,
+                "incidencia.revisar_alerta",
+                entity_type="incident_report",
+                entity_id=report.id,
+                details={"prioridad": report.priority},
+            )
+        self.session.commit()
 
     # --- Reporte ----------------------------------------------------------------
 
@@ -275,7 +305,9 @@ class IncidentService:
         report, record = self._assigned(user, report_id)
         if record.status != MAINTENANCE_IN_PROGRESS:
             raise BusinessRuleError("Solo se puede finalizar un mantenimiento en progreso.", code="transicion_invalida")
-        device_id = device_id if device_id is not None else record.device_id
+        if device_id is None:
+            device_id = record.device_id
+            sensor_id = sensor_id if sensor_id is not None else record.sensor_id
         if device_id is None:
             raise BusinessRuleError("Indique el dispositivo atendido.", code="dispositivo_requerido")
         self.maintenance.validate_target(device_id, sensor_id)
@@ -293,6 +325,7 @@ class IncidentService:
         self.session.flush()
         # Si algún repuesto no tiene stock suficiente, la transacción completa se revierte.
         self.maintenance.consume_parts(ctx, record, parts)
+        self.maintenance.apply_final_status(ctx, record, device_id, sensor_id, final_status)
         self._notify_reporter(
             report,
             "Su reporte fue atendido",

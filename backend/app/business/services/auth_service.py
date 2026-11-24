@@ -11,12 +11,14 @@ from app.business.services.audit_service import AuditService
 from app.business.services.context import RequestContext
 from app.core.clock import utcnow
 from app.core.config import get_settings
-from app.core.errors import BusinessRuleError, UnauthorizedError
+from app.core.errors import BusinessRuleError, TooManyRequestsError, UnauthorizedError
 from app.core.security import generate_token, hash_password, keyed_hash, verify_dummy_password, verify_password
 from app.data.models.security import User, UserSession
-from app.data.repositories.security import UserRepository, UserSessionRepository
+from app.data.repositories.security import AuditLogRepository, UserRepository, UserSessionRepository
 
 INVALID_CREDENTIALS = "Usuario o contraseña incorrectos, o la cuenta no está disponible."
+TOO_MANY_ATTEMPTS = "Demasiados intentos fallidos desde este equipo. Espere unos minutos e intente de nuevo."
+FAILED_LOGIN_ACTION = "auth.login_fallido"
 
 
 @dataclass(frozen=True)
@@ -32,16 +34,29 @@ class AuthService:
         self.users = UserRepository(session)
         self.sessions = UserSessionRepository(session)
         self.audit = AuditService(session)
+        self.audit_logs = AuditLogRepository(session)
         self.settings = get_settings()
+
+    def _check_ip_throttle(self, ctx: RequestContext, now: datetime) -> None:
+        if not ctx.ip:
+            return
+        since = now - timedelta(minutes=self.settings.login_ip_window_minutes)
+        if self.audit_logs.count_since(action=FAILED_LOGIN_ACTION, ip=ctx.ip, since=since) >= (
+            self.settings.login_max_failed_per_ip
+        ):
+            raise TooManyRequestsError(TOO_MANY_ATTEMPTS, code="demasiados_intentos")
 
     def login(self, ctx: RequestContext, username: str, password: str) -> LoginResult:
         now = utcnow()
+        self._check_ip_throttle(ctx, now)
         user = self.users.get_by_username(username)
         if user is None:
             verify_dummy_password(password)
             self._fail(ctx, username, None, "usuario_inexistente")
 
         if user.locked_until and user.locked_until > now:
+            # Mismo costo que una verificación real: el tiempo de respuesta no revela que la cuenta está bloqueada.
+            verify_dummy_password(password)
             self._fail(ctx, username, user, "cuenta_bloqueada")
 
         if not verify_password(password, user.password_hash):
@@ -77,7 +92,7 @@ class AuthService:
     def _fail(self, ctx: RequestContext, username: str, user: User | None, reason: str) -> NoReturn:
         self.audit.record(
             ctx,
-            "auth.login_fallido",
+            FAILED_LOGIN_ACTION,
             entity_type="user",
             entity_id=user.id if user else None,
             details={"username": username[:64], "motivo": reason},

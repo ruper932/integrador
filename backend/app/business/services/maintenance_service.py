@@ -16,6 +16,12 @@ from app.data.models.inventory import MAINTENANCE_FINISHED, MaintenanceItem, Mai
 from app.data.repositories.inventory import MaintenanceItemRepository, MaintenanceRecordRepository
 from app.data.repositories.iot import DeviceRepository, SensorRepository
 
+# Estado que toma el componente atendido según cómo terminó el mantenimiento. Uno fuera de servicio
+# deja de aceptar lecturas hasta otro mantenimiento que lo deje operativo; uno reemplazado se retira
+# (el administrador lo reactiva cuando instala la unidad nueva con el mismo código).
+STATUS_AFTER_MAINTENANCE = {"fuera_de_servicio": "mantenimiento", "reemplazado": "inactivo"}
+OPERATIVE = ("operativo", "operativo_con_observaciones")
+
 
 @dataclass(frozen=True)
 class UsedPart:
@@ -63,6 +69,27 @@ class MaintenanceService:
             raise BusinessRuleError(
                 "Un mantenimiento de reemplazo debe indicar los repuestos utilizados.", code="repuestos_requeridos"
             )
+
+    def apply_final_status(
+        self, ctx: RequestContext, record: MaintenanceRecord, device_id: int, sensor_id: int | None, final_status: str
+    ) -> None:
+        """Actualiza el estado del sensor atendido (o del dispositivo, si no se indicó sensor)."""
+        target = self.sensors.get(sensor_id) if sensor_id is not None else self.devices.get(device_id)
+        if target is None:
+            return
+        new_status = STATUS_AFTER_MAINTENANCE.get(final_status)
+        if new_status is None and final_status in OPERATIVE and target.status == "mantenimiento":
+            new_status = "activo"  # vuelve a operar; un componente inactivo solo lo reactiva el administrador
+        if new_status is None or new_status == target.status:
+            return
+        previous, target.status = target.status, new_status
+        self.audit.record(
+            ctx,
+            "sensor.estado_por_mantenimiento" if sensor_id is not None else "dispositivo.estado_por_mantenimiento",
+            entity_type="sensor" if sensor_id is not None else "device",
+            entity_id=target.id,
+            details={"maintenance_record_id": record.id, "anterior": previous, "nuevo": new_status},
+        )
 
     def consume_parts(self, ctx: RequestContext, record: MaintenanceRecord, parts: Sequence[UsedPart]) -> None:
         """Registra los repuestos utilizados y su salida de inventario (falla si no hay stock)."""
@@ -120,6 +147,7 @@ class MaintenanceService:
             )
         )
         self.consume_parts(ctx, record, parts)
+        self.apply_final_status(ctx, record, device_id, sensor_id, final_status)
         self.audit.record(
             ctx,
             "mantenimiento.registrar",

@@ -19,6 +19,7 @@ from app.business.services.infrastructure_service import (
 from app.core.permissions import Permission
 from app.presentation.api.deps import AuthContext, DbSession, require
 from app.presentation.schemas.iot import (
+    Connection,
     DeviceIn,
     DeviceOut,
     DeviceStatus,
@@ -119,9 +120,13 @@ _register_catalog("/greenhouses", greenhouse_service, GreenhouseIn, GreenhouseUp
 
 @router.get("/devices", response_model=list[DeviceOut])
 def list_devices(
-    db: DbSession, _: Reader, status: DeviceStatus | None = None, fog_collector_id: int | None = None
+    db: DbSession,
+    _: Reader,
+    status: DeviceStatus | None = None,
+    fog_collector_id: int | None = None,
+    connection: Connection | None = None,
 ) -> list[DeviceOut]:
-    devices = DeviceService(db).list(status=status, fog_collector_id=fog_collector_id)
+    devices = DeviceService(db).list(status=status, fog_collector_id=fog_collector_id, connection=connection)
     return [DeviceOut.model_validate(d) for d in devices]
 
 

@@ -111,6 +111,9 @@ def seed_demo() -> int:
         except SeedError as exc:
             print(exc, file=sys.stderr)
             return 1
+    if result["actualizada"]:
+        print(f"La base ya tenía datos de demostración: se agregaron {result['lecturas']} lecturas hasta ahora.")
+        return 0
     print(f"Datos de demostración cargados: {result['usuarios']} usuarios, {result['lecturas']} lecturas simuladas.")
     print(f"Contraseña de todas las cuentas de demostración: {DEMO_PASSWORD}")
     for u in USERS:

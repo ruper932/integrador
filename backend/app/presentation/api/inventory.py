@@ -2,10 +2,10 @@
 
 import csv
 import io
-from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from pydantic import AwareDatetime
 
 from app.business.services.inventory_period_service import InventoryPeriodService, PeriodSummary
 from app.business.services.inventory_service import InventoryService
@@ -261,8 +261,8 @@ def movements_report(
     format: ReportFormat = "json",
     item_id: int | None = None,
     movement_type: str | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: AwareDatetime | None = None,
+    date_to: AwareDatetime | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=10_000)] = 1000,
 ) -> Page[MovementOut] | Response:
@@ -388,8 +388,8 @@ def list_maintenance(
     device_id: int | None = None,
     sensor_id: int | None = None,
     maintenance_type: MaintenanceType | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: AwareDatetime | None = None,
+    date_to: AwareDatetime | None = None,
     status: MaintenanceStatus | None = None,
     final_status: FinalStatus | None = None,
     responsible_id: int | None = None,

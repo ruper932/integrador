@@ -128,7 +128,7 @@ def test_closed_period_is_immutable(admin_client, september, travel):
     assert move(admin_client, item["id"], "salida", 1).status_code == 201
 
 
-def test_period_rules(admin_client, september):
+def test_period_rules(admin_client, september, travel):
     period, item = september
     overlap = admin_client.post(PERIODS, json={"name": "Otro", "start_date": "2026-09-15", "end_date": "2026-10-15"})
     assert overlap.json()["error"]["code"] == "periodo_superpuesto"
@@ -138,7 +138,9 @@ def test_period_rules(admin_client, september):
     assert reversed_dates.json()["error"]["code"] == "rango_invalido"
     current = create_period(admin_client, "Octubre 2026", "2026-10-01", "2026-10-31")
     count(admin_client, current["id"], item["id"], 16)
+    travel(at(2026, 10, 15))  # octubre en curso, sin depender de la fecha real
     in_course = admin_client.post(f"{PERIODS}/{current['id']}/close")
+    travel(None)
     assert in_course.json()["error"]["code"] == "periodo_en_curso"
     # Los periodos se cierran en orden.
     create_period(admin_client, "Agosto 2026", "2026-08-01", "2026-08-31")
@@ -210,7 +212,7 @@ def test_inventory_reports(admin_client, september):
     summary = admin_client.get(
         EXPORT, params={"report": "inventario_periodo", "format": "xlsx", "period_id": period["id"]}
     )
-    rows = list(load_workbook(io.BytesIO(summary.content)).active.iter_rows(values_only=True))
+    rows = list(load_workbook(io.BytesIO(summary.content))["Detalle"].iter_rows(values_only=True))
     data = next(r for r in rows if r[0] == "CABLE-UTP")
     assert data[3:9] == (0, 20, 4, 0, -1, 15)
     assert rows[-1][0] == "TOTAL" and rows[-1][10] == pytest.approx(97.5)
@@ -228,7 +230,7 @@ def test_inventory_reports(admin_client, september):
             "date_to": "2026-10-01T00:00:00-04:00",
         },
     )
-    krows = list(load_workbook(io.BytesIO(kardex.content)).active.iter_rows(values_only=True))
+    krows = list(load_workbook(io.BytesIO(kardex.content))["Detalle"].iter_rows(values_only=True))
     saldos = [r[6] for r in krows if isinstance(r[6], (int, float))]
     assert saldos == [0, 10, 20, 16, 15]  # inicial, stock inicial, entrada, salida, ajuste
 

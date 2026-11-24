@@ -13,6 +13,10 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "openpyxl>=3.1",
     "reportlab>=4.2",
+    # Modelo de ML: misma versión de scikit-learn con la que se entrenó el artefacto (joblib no es portable entre versiones).
+    "scikit-learn==1.9.1",
+    "pandas>=2.2",
+    "joblib>=1.4",
 ]
 
 [project.optional-dependencies]

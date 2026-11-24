@@ -237,3 +237,36 @@ def test_notifications_belong_to_their_user(people):
     people["tecnico2"].post("/api/v1/notifications/read-all")
     assert unread(people["tecnico2"])["unread"] == 0
     assert len(unread(people["tecnico2"])["items"]) == 1  # se marca como leída, no se elimina
+
+
+def alerts(client):
+    response = client.get(f"{INCIDENTS}/alerts")
+    assert response.status_code == 200, response.text
+    return {kind: [a["id"] for a in items] for kind, items in response.json().items()}
+
+
+def test_high_alert_blocks_until_reviewed_and_medium_is_reminded_until_accepted(people, db):
+    high = report(people["docente"], None, priority="alta")
+    medium = report(people["docente"], None, priority="media", title="Lecturas extrañas del sensor")
+    report(people["docente"], None, priority="baja", title="Pintura del poste gastada")
+
+    assert alerts(people["tecnico"]) == {"blocking": [high["id"]], "reminders": [medium["id"]]}
+    assert alerts(people["docente"]) == {"blocking": [], "reminders": []}  # quien reporta no recibe la alerta
+
+    assert people["tecnico"].post(f"{INCIDENTS}/{high['id']}/review").status_code == 200
+    assert people["tecnico"].post(f"{INCIDENTS}/{medium['id']}/review").status_code == 200
+    # Revisar desbloquea solo a ese usuario; el recordatorio de la media sigue hasta que se acepte.
+    assert alerts(people["tecnico"]) == {"blocking": [], "reminders": [medium["id"]]}
+    assert alerts(people["tecnico2"])["blocking"] == [high["id"]]
+    reviews = db.scalars(select(AuditLog.entity_id).where(AuditLog.action == "incidencia.revisar_alerta")).all()
+    assert sorted(reviews) == sorted([str(high["id"]), str(medium["id"])])
+
+    people["tecnico2"].post(f"{INCIDENTS}/{high['id']}/accept")
+    people["tecnico2"].post(f"{INCIDENTS}/{medium['id']}/accept")
+    assert alerts(people["tecnico"]) == alerts(people["tecnico2"]) == {"blocking": [], "reminders": []}
+
+
+def test_review_alert_of_a_hidden_report_is_not_found(people):
+    high = report(people["docente"], None)
+    assert people["docente2"].post(f"{INCIDENTS}/{high['id']}/review").status_code == 404
+    assert people["tecnico"].post(f"{INCIDENTS}/999999/review").status_code == 404

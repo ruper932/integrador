@@ -7,12 +7,14 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.business.rules.connection import CONNECTION_LABELS, connection_state  # noqa: F401 - reexportada
 from app.business.services.audit_service import AuditService
 from app.business.services.context import RequestContext
 from app.business.services.integrity import integrity_guard
 from app.core.clock import utcnow
 from app.core.errors import BusinessRuleError, ForbiddenError, NotFoundError, UnauthorizedError
 from app.core.security import generate_device_key, keyed_hash
+from app.data.models.infrastructure import FogCollector
 from app.data.models.iot import Device, DeviceCredential, DeviceLocation, Sensor
 from app.data.repositories.iot import (
     DeviceCredentialRepository,
@@ -63,8 +65,14 @@ class DeviceService:
         self.fog_collectors = FogCollectorRepository(session)
         self.audit = AuditService(session)
 
-    def list(self, *, status: str | None = None, fog_collector_id: int | None = None) -> Sequence[Device]:
-        return self.devices.list(limit=1000, status=status, fog_collector_id=fog_collector_id, order_by=Device.code)
+    def list(
+        self, *, status: str | None = None, fog_collector_id: int | None = None, connection: str | None = None
+    ) -> Sequence[Device]:
+        devices = self.devices.list(limit=1000, status=status, fog_collector_id=fog_collector_id, order_by=Device.code)
+        if connection is None:
+            return devices
+        now = utcnow()
+        return [d for d in devices if connection_state(d.last_seen_at, d.sample_interval_s, now) == connection]
 
     def get(self, device_id: int) -> Device:
         device = self.devices.get(device_id)
@@ -86,16 +94,45 @@ class DeviceService:
         current = self.device_locations.get_current(device.id)
         if current and current.location_id == location_id:
             return
-        if location_id is not None and self.locations.get(location_id) is None:
-            raise BusinessRuleError("La ubicación indicada no existe.", code="referencia_inexistente")
+        if location_id is not None:
+            location = self.locations.get(location_id)
+            if location is None or not location.is_active:
+                raise BusinessRuleError(
+                    "La ubicación indicada no existe o está desactivada.", code="referencia_invalida"
+                )
         now = utcnow()
         if current:
             current.ended_at = now
         if location_id is not None:
             self.device_locations.add(DeviceLocation(device_id=device.id, location_id=location_id, started_at=now))
 
+    def follow_fog_collector(self, fog_collector_id: int, location_id: int) -> int:
+        """Traslada las estaciones montadas en un atrapanieblas a su nueva ubicación (el llamador hace
+        commit). Devuelve cuántas cambiaron de ubicación."""
+        moved = 0
+        for device in self.devices.list(limit=1000, fog_collector_id=fog_collector_id):
+            current = self.device_locations.get_current(device.id)
+            if current is None or current.location_id != location_id:
+                self._move_to(device, location_id)
+                moved += 1
+        return moved
+
+    def _fog_collector(self, fog_collector_id: int | None) -> FogCollector | None:
+        if fog_collector_id is None:
+            return None
+        fog_collector = self.fog_collectors.get(fog_collector_id)
+        if fog_collector is None or not fog_collector.is_active:
+            raise BusinessRuleError(
+                "El atrapanieblas indicado no existe o está desactivado.", code="referencia_invalida"
+            )
+        return fog_collector
+
     def create(self, ctx: RequestContext, data: dict[str, Any]) -> DeviceWithKey:
+        fog_collector = self._fog_collector(data.get("fog_collector_id"))
         location_id = data.pop("location_id", None)
+        if location_id is None and fog_collector is not None:
+            # La estación se instala en el atrapanieblas: por defecto toma su ubicación.
+            location_id = fog_collector.location_id
         with integrity_guard(self.session, duplicate_message="Ya existe un dispositivo con ese identificador."):
             device = self.devices.add(Device(status="activo", **data))
         self._move_to(device, location_id)
@@ -108,6 +145,11 @@ class DeviceService:
 
     def update(self, ctx: RequestContext, device_id: int, data: dict[str, Any]) -> Device:
         device = self.get(device_id)
+        for key in ("sample_interval_s", "status"):  # no admiten vacío: un null explícito no cambia nada
+            if key in data and data[key] is None:
+                del data[key]
+        if data.get("fog_collector_id") not in (None, device.fog_collector_id):
+            self._fog_collector(data["fog_collector_id"])
         if "location_id" in data:
             self._move_to(device, data.pop("location_id"))
         with integrity_guard(self.session, duplicate_message="Ya existe un dispositivo con ese identificador."):
@@ -166,10 +208,25 @@ class SensorService:
     def _validate_links(
         self, *, type_code: str, device: Device, fog_collector_id: int | None, tank_id: int | None
     ) -> None:
-        if fog_collector_id is not None and self.fog_collectors.get(fog_collector_id) is None:
-            raise BusinessRuleError("El atrapanieblas indicado no existe.", code="referencia_inexistente")
-        if tank_id is not None and self.tanks.get(tank_id) is None:
-            raise BusinessRuleError("El tanque indicado no existe.", code="referencia_inexistente")
+        if fog_collector_id is not None:
+            fog_collector = self.fog_collectors.get(fog_collector_id)
+            if fog_collector is None or not fog_collector.is_active:
+                raise BusinessRuleError(
+                    "El atrapanieblas indicado no existe o está desactivado.", code="referencia_invalida"
+                )
+            if device.fog_collector_id is not None and fog_collector_id != device.fog_collector_id:
+                raise BusinessRuleError(
+                    "El sensor debe asociarse al mismo atrapanieblas que su dispositivo.",
+                    code="atrapanieblas_distinto",
+                )
+        if tank_id is not None:
+            tank = self.tanks.get(tank_id)
+            if tank is None or not tank.is_active:
+                raise BusinessRuleError("El tanque indicado no existe o está desactivado.", code="referencia_invalida")
+            if tank.fog_collector_id is not None and fog_collector_id not in (None, tank.fog_collector_id):
+                raise BusinessRuleError(
+                    "El tanque indicado pertenece a otro atrapanieblas.", code="tanque_de_otro_atrapanieblas"
+                )
         if type_code == VOLUME_SENSOR_CODE and fog_collector_id is None:
             raise BusinessRuleError(
                 "Un sensor de volumen captado debe asociarse a un atrapanieblas.", code="atrapanieblas_requerido"

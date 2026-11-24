@@ -49,7 +49,7 @@ def test_csv_keeps_unmeasured_values_empty(admin_client, with_data):
 
 def test_volume_report_sums_incremental_values(admin_client, with_data):
     response = admin_client.get(EXPORT, params={"report": "volumen", "format": "xlsx", "bucket": "month"})
-    ws = load_workbook(io.BytesIO(response.content)).active
+    ws = load_workbook(io.BytesIO(response.content))["Detalle"]
     values = [row[1] for row in ws.iter_rows(values_only=True) if isinstance(row[1], (int, float))]
     assert sum(values) == pytest.approx(4.0)
 
@@ -79,7 +79,7 @@ CATALOG = "/api/v1/reports/catalog"
 
 def sheet_lines(response):
     """Encabezado (columna A) y filas de datos del Excel generado."""
-    rows = list(load_workbook(io.BytesIO(response.content)).active.iter_rows(values_only=True))
+    rows = list(load_workbook(io.BytesIO(response.content))["Detalle"].iter_rows(values_only=True))
     header_index = next(i for i, r in enumerate(rows) if r[0] is not None and i > 0 and r[1] is not None)
     return [r[0] for r in rows[1:header_index] if r[0]], rows[header_index], rows[header_index + 1 :]
 
@@ -92,6 +92,7 @@ def test_catalog_groups_reports_by_module_and_permission(admin_client, make_clie
         "Mantenimiento",
         "Reportes de incidencia",
         "Usuarios y auditoría",
+        "Análisis estadístico",
     }
     kardex = next(r for r in admin if r["kind"] == "inventario_kardex")
     assert {"key": "item_id", "label": "Repuesto", "required": True} in kardex["filters"]

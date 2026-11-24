@@ -1,12 +1,12 @@
 """Endpoints de ingesta IoT, históricos y dashboard."""
 
-from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import AwareDatetime
 
 from app.business.services.ingestion_service import IncomingReading, IngestionService
-from app.business.services.measurement_service import MeasurementService
+from app.business.services.measurement_service import LIVE_MAX_MINUTES, MeasurementService
 from app.core.permissions import Permission
 from app.presentation.api.deps import AuthContext, CurrentDevice, DbSession, require
 from app.presentation.schemas.common import Page
@@ -17,6 +17,10 @@ from app.presentation.schemas.iot import (
     DashboardSummaryOut,
     DeviceStatusOut,
     LatestValueOut,
+    LiveDeviceOut,
+    LiveOut,
+    LivePointOut,
+    LiveVariableOut,
     ReadingOut,
     ReadingResultOut,
     SensorTypeOut,
@@ -69,6 +73,7 @@ def receive_batch(payload: BatchIn, db: DbSession, device: CurrentDevice) -> Bat
             ReadingResultOut(message_id=r.message_id, status=r.status, quality=r.quality, detail=r.detail)
             for r in outcome.results
         ],
+        sample_interval_s=device.sample_interval_s,
     )
 
 
@@ -81,8 +86,8 @@ def list_measurements(
     sensor_type: str | None = Query(default=None, description="Código del tipo de sensor"),
     fog_collector_id: int | None = None,
     quality: Quality | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: AwareDatetime | None = None,
+    date_to: AwareDatetime | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
 ) -> Page[ReadingOut]:
@@ -150,8 +155,8 @@ def dashboard_series(
     _: DashboardReader,
     sensor_type: str = Query(description="Código del tipo de sensor, p. ej. volumen_captado"),
     bucket: Bucket = "day",
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: AwareDatetime | None = None,
+    date_to: AwareDatetime | None = None,
     device_id: int | None = None,
     sensor_id: int | None = None,
     fog_collector_id: int | None = None,
@@ -173,5 +178,46 @@ def dashboard_series(
         date_to=series.date_to,
         points=[
             SeriesPointOut(bucket=p.bucket, value=p.value, min=p.min, max=p.max, count=p.count) for p in series.points
+        ],
+    )
+
+
+@router.get(
+    "/dashboard/live",
+    response_model=LiveOut,
+    summary="Lecturas recientes de una estación para el monitoreo en vivo",
+)
+def dashboard_live(
+    db: DbSession,
+    _: DashboardReader,
+    device_id: int,
+    minutes: Annotated[int, Query(ge=1, le=LIVE_MAX_MINUTES)] = 60,
+) -> LiveOut:
+    live = MeasurementService(db).live(device_id, minutes)
+    device = live.device
+    return LiveOut(
+        generated_at=live.generated_at,
+        window_minutes=live.window_minutes,
+        device=LiveDeviceOut(
+            id=device.id,
+            code=device.code,
+            name=device.name,
+            status=device.status,
+            last_seen_at=device.last_seen_at,
+            sample_interval_s=device.sample_interval_s,
+            is_stale=live.is_stale,
+        ),
+        variables=[
+            LiveVariableOut(
+                sensor_type=SensorTypeOut.model_validate(v.sensor_type),
+                aggregation=v.sensor_type.aggregation,
+                latest_value=v.latest_value,
+                latest_at=v.latest_at,
+                minimum=v.minimum,
+                maximum=v.maximum,
+                average=v.average,
+                points=[LivePointOut(t=t, v=value) for t, value in v.points],
+            )
+            for v in live.variables
         ],
     )

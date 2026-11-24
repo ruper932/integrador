@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     CheckConstraint,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -23,7 +25,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.data.database import Base, TimestampMixin
 from app.data.models.infrastructure import FogCollector, Location, Tank
 
+if TYPE_CHECKING:
+    from app.data.models.security import User
+
 DEVICE_STATUSES = ("activo", "inactivo", "mantenimiento")
+# Segundos entre lecturas de la estación: 5 («tiempo real»), 30 o 60. La estación lo recibe en cada lote.
+SAMPLE_INTERVALS = (5, 30, 60)
+DEFAULT_SAMPLE_INTERVAL = 60
 SENSOR_STATUSES = ("activo", "inactivo", "mantenimiento")
 # incremental: el valor representa lo ocurrido en el intervalo (p. ej. litros captados desde la lectura anterior).
 # instantaneo: el valor representa el estado en el momento de la medición (temperatura, nivel del tanque).
@@ -33,7 +41,10 @@ READING_QUALITIES = ("valida", "sin_dato", "fuera_de_rango", "unidad_invalida", 
 
 class Device(Base, TimestampMixin):
     __tablename__ = "devices"
-    __table_args__ = (CheckConstraint(f"status IN {DEVICE_STATUSES}", name="status"),)
+    __table_args__ = (
+        CheckConstraint(f"status IN {DEVICE_STATUSES}", name="status"),
+        CheckConstraint(f"sample_interval_s IN {SAMPLE_INTERVALS}", name="sample_interval"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(40), unique=True)
@@ -43,8 +54,37 @@ class Device(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(16), default="activo")
     fog_collector_id: Mapped[int | None] = mapped_column(ForeignKey("fog_collectors.id"))
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Versión de firmware que la estación debe instalar por OTA (vacío: ninguna pendiente).
+    target_firmware_id: Mapped[int | None] = mapped_column(ForeignKey("firmware_releases.id"))
+    sample_interval_s: Mapped[int] = mapped_column(
+        Integer, default=DEFAULT_SAMPLE_INTERVAL, server_default=str(DEFAULT_SAMPLE_INTERVAL)
+    )
 
     fog_collector: Mapped[FogCollector | None] = relationship(lazy="joined")
+    target_firmware: Mapped["FirmwareRelease | None"] = relationship(lazy="joined")
+
+    @property
+    def target_firmware_version(self) -> str | None:
+        return self.target_firmware.version if self.target_firmware else None
+
+
+class FirmwareRelease(Base):
+    """Imagen de firmware de la estación cargada al servidor local. No se elimina: queda como historial."""
+
+    __tablename__ = "firmware_releases"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Leída del propio archivo (marca «ATINA-FW:<versión>;»), nunca escrita a mano.
+    version: Mapped[str] = mapped_column(String(32), unique=True)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    md5: Mapped[str] = mapped_column(String(32))  # el ESP32 lo verifica al instalar (cabecera x-MD5)
+    content: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)  # en la base: entra en los respaldos
+    notes: Mapped[str | None] = mapped_column(Text)
+    uploaded_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    uploaded_by: Mapped["User"] = relationship(lazy="joined")
 
 
 class DeviceCredential(Base):

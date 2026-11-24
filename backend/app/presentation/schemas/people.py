@@ -17,7 +17,8 @@ InstitutionType = Literal[
     "otra",
 ]
 EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
-NAME_PATTERN = r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]+$"
+# Letras, espacios, apóstrofo, punto o guion, con al menos una letra («   » o «--» no son nombres).
+NAME_PATTERN = r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]*[A-Za-zÁÉÍÓÚÜÑáéíóúüñ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]*$"
 
 
 class PersonalDataIn(BaseModel):

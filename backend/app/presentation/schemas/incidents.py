@@ -73,11 +73,17 @@ class IncidentSummaryOut(BaseModel):
     all: dict[str, int] | None
 
 
+class IncidentAlertsOut(BaseModel):
+    blocking: list[IncidentOut] = Field(description="Alertas de prioridad alta sin revisar: bloquean la interfaz")
+    reminders: list[IncidentOut] = Field(description="Alertas de prioridad media que siguen sin atender")
+
+
 class NotificationOut(ORMModel):
     id: int
     title: str
     message: str
     incident_report_id: int | None
+    relocation_id: int | None
     created_at: datetime
     read_at: datetime | None
 

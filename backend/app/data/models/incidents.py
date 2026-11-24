@@ -68,5 +68,6 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String(150))
     message: Mapped[str] = mapped_column(String(500))
     incident_report_id: Mapped[int | None] = mapped_column(ForeignKey("incident_reports.id"))
+    relocation_id: Mapped[int | None] = mapped_column(ForeignKey("fog_collector_relocations.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

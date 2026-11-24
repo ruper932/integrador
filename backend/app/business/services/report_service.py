@@ -12,6 +12,8 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from app.business.rules.connection import CONNECTION_LABELS, MISSED_INTERVALS, connection_state
+from app.business.services.analysis_service import AnalysisService
 from app.business.services.audit_service import AuditService
 from app.business.services.context import RequestContext
 from app.business.services.device_service import DeviceService
@@ -26,7 +28,8 @@ from app.business.services.report_catalog import (
     ReportDefinition,
     available_for,
 )
-from app.business.services.report_renderers import RENDERERS, RenderedFile, Report
+from app.business.services.report_charts import add_charts, readable
+from app.business.services.report_renderers import RENDERERS, Chart, RenderedFile, Report, Series
 from app.core.clock import utcnow
 from app.core.config import get_settings
 from app.core.errors import BusinessRuleError, ForbiddenError
@@ -68,6 +71,7 @@ class ReportFilters:
     fog_collector_id: int | None = None
     quality: str | None = None
     device_status: str | None = None
+    connection: str | None = None
     # Inventario
     category_id: int | None = None
     item_id: int | None = None
@@ -125,6 +129,7 @@ class ReportService:
         self.positions = PositionRepository(session)
         self.audit_logs = AuditLogRepository(session)
         self.audit = AuditService(session)
+        self.analysis = AnalysisService(session)
         self.tz = ZoneInfo(get_settings().local_timezone)
 
     # --- Catálogo y opciones -----------------------------------------------------
@@ -154,15 +159,13 @@ class ReportService:
 
     # --- Exportación ---------------------------------------------------------------
 
-    def export(self, ctx: RequestContext, kind: str, fmt: str, filters: ReportFilters) -> RenderedFile:
+    def build(self, ctx: RequestContext, kind: str, filters: ReportFilters) -> Report:
+        """Arma el reporte (detalle, resumen y gráficos) verificando permisos y filtros obligatorios."""
         definition = BY_KIND.get(kind)
         if definition is None:
             raise BusinessRuleError("Tipo de reporte no soportado.", code="reporte_invalido")
         if definition not in self.catalog(ctx):
             raise ForbiddenError("No tiene permiso para generar este reporte.")
-        renderer = RENDERERS.get(fmt)
-        if renderer is None:
-            raise BusinessRuleError("Formato no soportado.", code="formato_invalido")
         for key in definition.required:
             if getattr(filters, key) is None:
                 raise BusinessRuleError(
@@ -170,11 +173,24 @@ class ReportService:
                     code=REQUIRED_ERROR_CODES.get(key, "filtro_requerido"),
                 )
         filters = self._with_default_range(filters)
-        report = getattr(self, f"_build_{kind}")(filters)
+        builder = getattr(self, f"_build_{kind}")
+        # El análisis incluye solo las secciones que el usuario puede consultar.
+        report = add_charts(kind, builder(filters, ctx) if kind == "analisis" else builder(filters))
         report.filters = [*self._describe(definition, filters), *report.filters]
         report.generated_at = utcnow().astimezone(self.tz)
         report.generated_by = ctx.user.full_name if ctx.user else None
-        applied = {k: v for k, v in self._applied(definition, filters).items() if k != "date_range"}
+        return report
+
+    def export(self, ctx: RequestContext, kind: str, fmt: str, filters: ReportFilters) -> RenderedFile:
+        renderer = RENDERERS.get(fmt)
+        if renderer is None:
+            raise BusinessRuleError("Formato no soportado.", code="formato_invalido")
+        report = self.build(ctx, kind, filters)
+        applied = {
+            k: v
+            for k, v in self._applied(BY_KIND[kind], self._with_default_range(filters)).items()
+            if k != "date_range"
+        }
         self.audit.record(
             ctx,
             "reporte.exportar",
@@ -248,6 +264,8 @@ class ReportService:
             return named(self.positions.get(int(value)), "name")  # type: ignore[arg-type]
         if key == "origin":
             return ORIGIN_LABELS.get(str(value), str(value))
+        if key == "connection":
+            return CONNECTION_LABELS.get(str(value), str(value))
         return str(value).replace("_", " ")
 
     def _local(self, value: datetime | None) -> datetime | None:
@@ -629,22 +647,14 @@ class ReportService:
 
     def _build_dispositivos(self, f: ReportFilters) -> Report:
         now = utcnow()
-        stale_after = timedelta(minutes=get_settings().device_stale_minutes)
-        devices = [
-            d
-            for d in self.device_service.list(status=f.device_status)
-            if f.fog_collector_id is None or d.fog_collector_id == f.fog_collector_id
-        ]
+        devices = self.device_service.list(
+            status=f.device_status, fog_collector_id=f.fog_collector_id, connection=f.connection
+        )
         rows: list[list[object]] = []
         for d in devices:
             sensors = self.sensors.list_by_device(d.id)
             location = self.device_service.current_location(d.id)
-            if d.last_seen_at is None:
-                situation = "Sin comunicación"
-            elif now - d.last_seen_at > stale_after:
-                situation = "Desactualizado"
-            else:
-                situation = "Al día"
+            situation = CONNECTION_LABELS[connection_state(d.last_seen_at, d.sample_interval_s, now)]
             rows.append(
                 [
                     d.code,
@@ -676,7 +686,8 @@ class ReportService:
             ],
             rows=rows,
             filters=[
-                f"Se considera desactualizado tras {get_settings().device_stale_minutes} minutos sin comunicación."
+                f"Se considera desactualizado tras {MISSED_INTERVALS} intervalos de envío sin comunicación "
+                f"(como máximo {get_settings().device_stale_minutes} minutos)."
             ],
         )
 
@@ -834,3 +845,161 @@ class ReportService:
             ],
             filters=notes,
         )
+
+    # --- Análisis estadístico --------------------------------------------------------
+
+    def _build_analisis(self, f: ReportFilters, ctx: RequestContext) -> Report:  # noqa: PLR0915 - una sección por módulo
+        a = self.analysis.analyze(
+            ctx,
+            date_from=f.date_from,
+            date_to=f.date_to,
+            device_id=f.device_id,
+            fog_collector_id=f.fog_collector_id,
+        )
+        rows: list[list[object]] = []
+        charts: list[Chart] = []
+        summary: list[tuple[str, str]] = []
+
+        def add(section: str, label: str, value: object, unit: str | None = None, note: str | None = None) -> None:
+            rows.append([section, label, round(value, 3) if isinstance(value, float) else value, unit, note])
+
+        def stats(section: str, name: str, s: dict[str, object], unit: str) -> None:
+            note = f"n = {s['n']} días"
+            for key, label in (
+                ("mean", "media"),
+                ("median", "mediana"),
+                ("std", "desviación estándar"),
+                ("min", "mínimo"),
+                ("max", "máximo"),
+            ):
+                add(section, f"{name}: {label}", s[key], unit, note)
+
+        def counts(title: str, data: dict[str, int], unit: str) -> Chart:
+            ranked = sorted(data.items(), key=lambda kv: -kv[1])
+            return Chart(
+                title,
+                "bar",
+                [readable(k) for k, _ in ranked],
+                [Series(unit.capitalize(), [float(n) for _, n in ranked])],
+                unit,
+            )
+
+        if capture := a.get("capture"):
+            section = "Captación de agua"
+            add(section, "Volumen total captado", capture["total"], "L")
+            add(section, "Días con datos", capture["days_with_data"], "días")
+            add(section, "Días con captación", capture["days_with_capture"], "días")
+            add(section, "Día de mayor captación", capture["best_day"])
+            stats(section, "Volumen diario", capture["daily"], "L/día")
+            for fog in capture["by_fog_collector"]:
+                share = f"{fog['share'] * 100:.1f} % del total" if fog["share"] is not None else None
+                add(section, f"Total en {fog['name']}", fog["total"], "L", share)
+            summary += [
+                ("Volumen total captado", f"{capture['total']:.2f} L".replace(".", ",")),
+                (
+                    "Promedio diario",
+                    f"{capture['daily']['mean']:.2f} L/día".replace(".", ",")
+                    if capture["daily"]["mean"] is not None
+                    else "—",
+                ),
+                ("Días con captación", f"{capture['days_with_capture']} de {capture['days_with_data']}"),
+            ]
+            charts.append(
+                Chart(
+                    "Volumen captado por día",
+                    "bar",
+                    [p["date"] for p in capture["series"]],
+                    [Series("Volumen (L)", [p["value"] for p in capture["series"]])],
+                    "L",
+                )
+            )
+            if capture["by_fog_collector"]:
+                charts.append(
+                    Chart(
+                        "Volumen captado por atrapanieblas",
+                        "bar",
+                        [fog["name"] for fog in capture["by_fog_collector"]],
+                        [Series("Volumen (L)", [fog["total"] for fog in capture["by_fog_collector"]])],
+                        "L",
+                        horizontal=True,
+                    )
+                )
+        for variable in a.get("variables", []):
+            stats("Variables ambientales", variable["name"], variable, variable["unit"])
+        correlations = a.get("correlations", [])
+        for c in correlations:
+            add(
+                "Correlación con el volumen diario",
+                f"{c['name']} (r de Pearson)",
+                c["r"],
+                None,
+                f"{c['strength']}; n = {c['n']} días",
+            )
+        measured = [c for c in correlations if c["r"] is not None]
+        if measured:
+            charts.append(
+                Chart(
+                    "Correlación de cada variable con el volumen diario",
+                    "bar",
+                    [c["name"] for c in measured],
+                    [Series("r de Pearson", [c["r"] for c in measured])],
+                    "coeficiente de Pearson (−1 a 1); no implica causalidad",
+                    horizontal=True,
+                )
+            )
+        if quality := a.get("quality"):
+            section = "Calidad de los datos"
+            add(section, "Lecturas recibidas", quality["total"], "lecturas")
+            for key, count in quality["by_quality"].items():
+                add(section, f"Lecturas: {readable(key).lower()}", count, "lecturas")
+            for device in quality["by_device"]:
+                add(
+                    section,
+                    f"Lecturas válidas en {device['device']}",
+                    round(device["valid_share"] * 100, 1),
+                    "%",
+                    f"de {device['total']} lecturas",
+                )
+            if quality["valid_share"] is not None:
+                summary.append(("Lecturas válidas", f"{quality['valid_share'] * 100:.1f} %".replace(".", ",")))
+            if quality["by_quality"]:
+                charts.append(counts("Lecturas por calidad", quality["by_quality"], "lecturas"))
+        if maintenance := a.get("maintenance"):
+            section = "Mantenimiento"
+            add(section, "Mantenimientos finalizados", maintenance["total"], "mantenimientos")
+            add(section, "Originados en reportes de incidencia", maintenance["from_incidents"], "mantenimientos")
+            add(section, "Con uso de repuestos", maintenance["with_parts"], "mantenimientos")
+            for key, count in maintenance["by_type"].items():
+                add(section, f"Tipo: {readable(key).lower()}", count, "mantenimientos")
+            for key, count in maintenance["by_final_status"].items():
+                add(section, f"Estado final: {readable(key).lower()}", count, "mantenimientos")
+            if maintenance["by_type"]:
+                charts.append(counts("Mantenimientos por tipo", maintenance["by_type"], "mantenimientos"))
+        if incidents := a.get("incidents"):
+            section = "Reportes de incidencia"
+            add(section, "Reportes registrados", incidents["total"], "reportes")
+            for key, count in incidents["by_status"].items():
+                add(section, f"Estado: {readable(key).lower()}", count, "reportes")
+            for key, count in incidents["by_priority"].items():
+                add(section, f"Prioridad: {readable(key).lower()}", count, "reportes")
+            stats(section, "Horas hasta aceptar", incidents["hours_to_accept"], "h")
+            stats(section, "Horas hasta finalizar", incidents["hours_to_finish"], "h")
+            if incidents["by_status"]:
+                charts.append(counts("Reportes de incidencia por estado", incidents["by_status"], "reportes"))
+        if inventory := a.get("inventory"):
+            section = "Inventario"
+            add(section, "Repuestos con stock bajo", inventory["low_stock"], "repuestos")
+            for item in inventory["top_consumed"]:
+                add(section, f"Consumo de {item['code']} {item['name']}", item["quantity"], item["unit"])
+        for row in rows:  # las estadísticas sin datos quedan vacías, no en 0
+            if row[2] is None and row[4] is None:
+                row[4] = "Sin datos en el periodo"
+        report = Report(
+            title="Análisis estadístico del periodo",
+            filename="analisis_estadistico",
+            columns=["Sección", "Indicador", "Valor", "Unidad", "Observación"],
+            rows=rows,
+            filters=["Solo lecturas válidas; los días sin datos no se cuentan como cero."],
+        )
+        report.summary, report.charts = summary, charts
+        return report

@@ -2,7 +2,9 @@
 
 Carga usuarios de cada rol (excepto administrador), infraestructura, estaciones IoT con 30 días
 de lecturas SIMULADAS, inventario con periodos cerrados y abiertos, mantenimientos, reportes de
-incidencia en cada etapa de atención y solicitudes de recuperación. Todo pasa por los servicios
+incidencia en cada etapa de atención, solicitudes de reubicación de atrapanieblas y solicitudes de
+recuperación. Si la base ya tiene los datos de demostración, completa las lecturas hasta la hora
+actual y agrega lo que falte (p. ej. las reubicaciones). Todo pasa por los servicios
 del sistema, de modo que se aplican las mismas validaciones y queda registro en la auditoría.
 
 Importante: las lecturas son simuladas. Una base con estos datos no debe usarse para entrenar
@@ -34,13 +36,21 @@ from app.business.services.inventory_period_service import InventoryPeriodServic
 from app.business.services.inventory_service import InventoryService
 from app.business.services.maintenance_service import MaintenanceService, UsedPart
 from app.business.services.recovery_service import RecoveryService
+from app.business.services.relocation_service import RelocationService
 from app.business.services.user_service import UserService
 from app.core.clock import utcnow
 from app.core.permissions import ROLE_ADMIN
 from app.data.models.iot import SensorCalibration
 from app.data.models.security import User
-from app.data.repositories.iot import DeviceRepository, SensorCalibrationRepository, SensorTypeRepository
+from app.data.repositories.iot import (
+    DeviceRepository,
+    SensorCalibrationRepository,
+    SensorReadingRepository,
+    SensorTypeRepository,
+    TankRepository,
+)
 from app.data.repositories.people import AcademicLevelRepository, InstitutionRepository, PositionRepository
+from app.data.repositories.relocations import RelocationRepository
 from app.data.repositories.security import RoleRepository, UserRepository
 
 DEMO_PASSWORD = "Atina-Demo-2026"  # noqa: S105 - solo para cuentas de demostración
@@ -178,9 +188,9 @@ BIRTH_DATES = {
 
 # Sensores de cada estación: (código, tipo, modelo)
 SENSORS = [
-    ("temp", "temperatura", "SHT31"),
-    ("hum", "humedad_relativa", "SHT31"),
-    ("pres", "presion_atmosferica", "BMP280"),
+    ("temp", "temperatura", "BME280 (respaldo DHT11)"),
+    ("hum", "humedad_relativa", "BME280 (respaldo DHT11)"),
+    ("pres", "presion_atmosferica", "BME280"),
     ("viento", "velocidad_viento", "Anemómetro de cazoletas"),
     ("dir", "direccion_viento", "Veleta analógica"),
     ("niebla", "niebla", "Sensor óptico de niebla"),
@@ -267,15 +277,33 @@ class DemoSeeder:
 
     def run(self) -> dict[str, int]:
         if DeviceRepository(self.session).get_by_code(MARKER_DEVICE):
-            raise SeedError("La base ya tiene datos de demostración (existe el dispositivo esp32-01).")
+            return self.update()
         self._users()
         devices = self._infrastructure()
         readings = self._readings(devices)
         self._inventory()
         self._maintenance(devices)
         self._incidents(devices)
+        self._relocations(devices)
         self._recovery()
-        return {"usuarios": len(self.users), "lecturas": readings}
+        return {"usuarios": len(self.users), "lecturas": readings, "actualizada": 0}
+
+    def update(self) -> dict[str, int]:
+        """Base ya cargada: completa las lecturas desde la última hasta ahora y agrega lo que falte."""
+        users = UserRepository(self.session)
+        self.users = {u.username: u for u in (users.get_by(username=d.username) for d in USERS) if u}
+        repo, tanks = DeviceRepository(self.session), TankRepository(self.session)
+        devices = []
+        for code in (MARKER_DEVICE, "esp32-02"):
+            device = repo.get_by_code(code)
+            if device is None or device.fog_collector is None:
+                raise SeedError(f"Falta la estación de demostración {code}; no se puede completar la base.")
+            tank = tanks.list(limit=1, fog_collector_id=device.fog_collector_id)[0]
+            devices.append((device, device.fog_collector, tank))
+        readings = self._readings(devices, resume=True)
+        if not RelocationRepository(self.session).search(offset=0, limit=1)[1]:
+            self._relocations(devices)
+        return {"usuarios": len(self.users), "lecturas": readings, "actualizada": 1}
 
     # --- Usuarios -------------------------------------------------------------
 
@@ -493,20 +521,30 @@ class DemoSeeder:
 
     # --- Lecturas simuladas ---------------------------------------------------
 
-    def _readings(self, devices: list) -> int:
+    def _readings(self, devices: list, *, resume: bool = False) -> int:
+        """Lecturas horarias simuladas; con `resume`, solo las horas posteriores a la última lectura."""
         ingestion = IngestionService(self.session)
+        latest = SensorReadingRepository(self.session)
         now = utcnow().replace(minute=0, second=0, microsecond=0)
         total = 0
         for index, (device, collector, tank) in enumerate(devices):
             area = float(collector.mesh_area_m2)
             height = float(tank.height_cm)
             level = height * (0.35 + 0.1 * index)
+            first_hour = READING_DAYS * 24
+            if resume:
+                previous = latest.latest_valid_per_sensor(device.id)
+                if previous:
+                    last_at = max(r.measured_at for r in previous)
+                    first_hour = int((now - last_at).total_seconds() // 3600) - 1
+                    levels = [r.value for r in previous if r.sensor.code == "nivel"]
+                    level = levels[0] if levels else level
             regime = 0.0
             fog_on = False
             # La estación sur dejó de transmitir hace 3 horas (muestra el aviso de datos desactualizados).
             last_hour = 0 if index == 0 else 3
             readings: list[IncomingReading] = []
-            for h in range(READING_DAYS * 24, last_hour - 1, -1):
+            for h in range(first_hour, last_hour - 1, -1):
                 ts = now - timedelta(hours=h)
                 local_hour = (ts.hour - 4) % 24
                 if local_hour == 0:
@@ -552,6 +590,8 @@ class DemoSeeder:
                 readings += [
                     IncomingReading(uuid.uuid4(), code, recent, last[code].value, UNITS[code]) for code in last
                 ]
+            if not readings:
+                continue
             for start in range(0, len(readings), 400):
                 outcome = ingestion.ingest(
                     device,
@@ -841,6 +881,66 @@ class DemoSeeder:
             description="Se renovó el sellado de la tapa y de los prensaestopas con silicona.",
             final_status="operativo",
             parts=[UsedPart(self.items["SILICONA"].id, Decimal(1))],
+        )
+
+    # --- Reubicación de atrapanieblas -----------------------------------------
+
+    def _relocations(self, devices: list) -> None:
+        """Una solicitud rechazada, una finalizada (el atrapanieblas sur se traslada) y una pendiente."""
+        north, south = devices[0][1], devices[1][1]
+        ctx = {name: RequestContext(user=self.users[name]) for name in ("jchoque", "lticona", "mhuanca", "smamani")}
+        service = RelocationService(self.session)
+
+        rejected = service.request(
+            ctx["jchoque"],
+            fog_collector_id=north.id,
+            reason="obstruccion_de_la_niebla",
+            description="Los eucaliptos que crecieron al oeste del atrapanieblas norte parecen frenar la niebla.",
+            proposed_location_id=south.location_id,
+            proposed_place=None,
+        )
+        service.reject(
+            ctx["mhuanca"],
+            rejected.id,
+            reason="La ladera sur recibe menos niebla; conviene podar los eucaliptos antes que mover la malla.",
+        )
+
+        plateau = location_service(self.session).create(
+            self.admin_ctx,
+            {
+                "name": "Titicachi — explanada alta",
+                "description": "Explanada sobre el invernadero 2, abierta al viento del este",
+                "latitude": Decimal("-15.404200"),
+                "longitude": Decimal("-68.934900"),
+                "altitude_m": Decimal("3120"),
+            },
+        )
+        moved = service.request(
+            ctx["lticona"],
+            fog_collector_id=south.id,
+            reason="interferencia_con_actividades",
+            description="El invernadero 2 se ampliará hacia la ladera donde está instalado el atrapanieblas sur.",
+            proposed_location_id=plateau.id,
+            proposed_place=None,
+        )
+        service.accept(ctx["smamani"], moved.id)
+        service.start(ctx["smamani"], moved.id)
+        service.finish(
+            ctx["smamani"],
+            moved.id,
+            destination_location_id=plateau.id,
+            new_orientation="E",
+            work_notes="Se desmontó la malla, se trasladaron los postes y se anclaron con tensores; "
+            "la estación quedó transmitiendo desde el nuevo sitio.",
+        )
+
+        service.request(
+            ctx["lticona"],
+            fog_collector_id=north.id,
+            reason="espacio_insuficiente",
+            description="Se construirá un aula nueva junto al atrapanieblas norte y faltará espacio para los tensores.",
+            proposed_location_id=None,
+            proposed_place="Detrás del invernadero 1, junto al cerco",
         )
 
     # --- Recuperación de cuentas ---------------------------------------------

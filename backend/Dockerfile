@@ -10,6 +10,7 @@ RUN pip install .
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY artifacts ./artifacts
+COPY firmware_base ./firmware_base
 
 RUN useradd --create-home --uid 1000 api && chown -R api /app
 USER api

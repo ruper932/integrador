@@ -12,6 +12,9 @@ from app.presentation.schemas.common import ORMModel
 CODE_PATTERN = r"^[A-Za-z0-9_.-]{2,40}$"
 DeviceStatus = Literal["activo", "inactivo", "mantenimiento"]
 Bucket = Literal["hour", "day", "week", "month"]
+SampleInterval = Literal[5, 30, 60]
+Connection = Literal["al_dia", "desactualizado", "sin_comunicacion"]
+Orientation = Literal["N", "NE", "E", "SE", "S", "SO", "O", "NO"]
 
 
 # --- Infraestructura -------------------------------------------------------
@@ -46,7 +49,7 @@ class FogCollectorIn(BaseModel):
     location_id: int | None = None
     mesh_area_m2: Decimal | None = Field(default=None, gt=0, le=10_000)
     mesh_type: str | None = Field(default=None, max_length=80)
-    orientation: str | None = Field(default=None, max_length=40, description="Orientación de la malla, p. ej. NE")
+    orientation: Orientation | None = Field(default=None, description="Orientación de la malla, p. ej. NE")
     installed_on: date | None = None
 
 
@@ -147,6 +150,9 @@ class DeviceUpdate(BaseModel):
     fog_collector_id: int | None = None
     location_id: int | None = None
     status: DeviceStatus | None = None
+    sample_interval_s: SampleInterval | None = Field(
+        default=None, description="Segundos entre lecturas: 5 (tiempo real), 30 o 60"
+    )
 
 
 class DeviceOut(ORMModel):
@@ -155,9 +161,11 @@ class DeviceOut(ORMModel):
     name: str
     description: str | None
     firmware_version: str | None
+    target_firmware_version: str | None = Field(default=None, description="Versión asignada para instalar por OTA")
     status: str
     fog_collector_id: int | None
     last_seen_at: datetime | None
+    sample_interval_s: int
     created_at: datetime
 
 
@@ -240,6 +248,7 @@ class BatchResultOut(BaseModel):
     rejected: int
     duplicates: int
     results: list[ReadingResultOut]
+    sample_interval_s: int = Field(description="Intervalo de muestreo que la estación debe aplicar desde ahora")
 
 
 class ReadingOut(ORMModel):
@@ -312,3 +321,39 @@ class SeriesOut(BaseModel):
     date_from: datetime
     date_to: datetime
     points: list[SeriesPointOut]
+
+
+# --- Monitoreo en vivo -------------------------------------------------------
+
+
+class LivePointOut(BaseModel):
+    t: datetime
+    v: float
+
+
+class LiveVariableOut(BaseModel):
+    sensor_type: SensorTypeOut
+    aggregation: str
+    latest_value: float | None
+    latest_at: datetime | None
+    minimum: float | None
+    maximum: float | None
+    average: float | None
+    points: list[LivePointOut]
+
+
+class LiveDeviceOut(BaseModel):
+    id: int
+    code: str
+    name: str
+    status: str
+    last_seen_at: datetime | None
+    sample_interval_s: int
+    is_stale: bool
+
+
+class LiveOut(BaseModel):
+    generated_at: datetime
+    window_minutes: int
+    device: LiveDeviceOut
+    variables: list[LiveVariableOut]

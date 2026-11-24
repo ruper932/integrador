@@ -1,9 +1,9 @@
 """Análisis estadístico de la información de los módulos."""
 
-from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
+from pydantic import AwareDatetime
 
 from app.business.services.analysis_service import AnalysisService
 from app.core.permissions import Permission
@@ -20,8 +20,8 @@ Analyst = Annotated[AuthContext, Depends(require(Permission.REPORTS_GENERATE))]
 def analysis(
     db: DbSession,
     auth: Analyst,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: AwareDatetime | None = None,
+    date_to: AwareDatetime | None = None,
     device_id: int | None = None,
     fog_collector_id: int | None = None,
 ) -> dict[str, Any]:  # shortcut: respuesta sin esquema Pydantic propio; tiparla si otro cliente la consume.

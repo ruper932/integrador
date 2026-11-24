@@ -1,10 +1,9 @@
 """Exportación de reportes generados en el servidor."""
 
-from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import BaseModel
+from pydantic import AwareDatetime, BaseModel, Field
 
 from app.business.services.report_catalog import FILTER_LABELS
 from app.business.services.report_service import ReportFilters, ReportService
@@ -12,12 +11,13 @@ from app.core.permissions import Permission
 from app.presentation.api.deps import AuthContext, DbSession, require
 from app.presentation.schemas.incidents import IncidentStatus, Priority
 from app.presentation.schemas.inventory import FinalStatus, ItemCondition, MaintenanceType
-from app.presentation.schemas.iot import Bucket, DeviceStatus
+from app.presentation.schemas.iot import Bucket, Connection, DeviceStatus
 
 router = APIRouter(tags=["Reportes"])
 
 ReportGenerator = Annotated[AuthContext, Depends(require(Permission.REPORTS_GENERATE))]
 ReportKind = Literal[
+    "analisis",
     "volumen",
     "variable",
     "mediciones",
@@ -95,25 +95,16 @@ def report_filter_options(db: DbSession, auth: ReportGenerator) -> FilterOptions
     )
 
 
-@router.get(
-    "/reports/export",
-    summary="Exportar un reporte en CSV, Excel o PDF",
-    response_class=Response,
-    responses={200: {"content": {"text/csv": {}, "application/pdf": {}}}},
-)
-def export_report(  # noqa: PLR0913 - cada filtro es un parámetro de consulta documentado
-    db: DbSession,
-    auth: ReportGenerator,
-    report: ReportKind,
-    format: Literal["csv", "xlsx", "pdf"] = "xlsx",
-    date_from: datetime | None = Query(default=None, description="Por defecto, 30 días antes de date_to"),
-    date_to: datetime | None = None,
+def report_filters(  # noqa: PLR0913 - cada filtro es un parámetro de consulta documentado
+    date_from: AwareDatetime | None = Query(default=None, description="Por defecto, 30 días antes de date_to"),
+    date_to: AwareDatetime | None = None,
     bucket: Bucket = "day",
     device_id: int | None = None,
     sensor_type: str | None = None,
     fog_collector_id: int | None = None,
     quality: Quality | None = None,
     device_status: DeviceStatus | None = None,
+    connection: Connection | None = Query(default=None, description="Situación de comunicación de la estación"),
     category_id: int | None = None,
     item_id: int | None = Query(default=None, description="Repuesto (kardex, movimientos, consumo)"),
     condition: ItemCondition | None = None,
@@ -133,41 +124,80 @@ def export_report(  # noqa: PLR0913 - cada filtro es un parámetro de consulta d
     is_active: bool | None = None,
     action: str | None = Query(default=None, max_length=80),
     actor_id: int | None = None,
-) -> Response:
-    rendered = ReportService(db).export(
-        auth.ctx,
-        report,
-        format,
-        ReportFilters(
-            date_from=date_from,
-            date_to=date_to,
-            bucket=bucket,
-            device_id=device_id,
-            sensor_type=sensor_type,
-            fog_collector_id=fog_collector_id,
-            quality=quality,
-            device_status=device_status,
-            category_id=category_id,
-            item_id=item_id,
-            condition=condition,
-            low_stock_only=low_stock_only,
-            include_inactive=include_inactive,
-            movement_type=movement_type,
-            period_id=period_id,
-            maintenance_type=maintenance_type,
-            final_status=final_status,
-            responsible_id=responsible_id,
-            origin=origin,
-            incident_status=incident_status,
-            priority=priority,
-            reporter_id=reporter_id,
-            role_id=role_id,
-            position_id=position_id,
-            is_active=is_active,
-            action=action,
-            actor_id=actor_id,
-        ),
+) -> ReportFilters:
+    return ReportFilters(**locals())
+
+
+Filters = Annotated[ReportFilters, Depends(report_filters)]
+
+
+class SeriesOut(BaseModel):
+    name: str
+    values: list[float | None]
+
+
+class ChartOut(BaseModel):
+    title: str
+    kind: Literal["bar", "line"]
+    unit: str
+    horizontal: bool
+    categories: list[str]
+    series: list[SeriesOut]
+
+
+class SummaryItemOut(BaseModel):
+    label: str
+    value: str
+
+
+class ReportChartsOut(BaseModel):
+    title: str
+    rows: int
+    criteria: list[str] = Field(description="Filtros aplicados y notas, tal como aparecen en el archivo exportado")
+    summary: list[SummaryItemOut]
+    charts: list[ChartOut]
+
+
+@router.get(
+    "/reports/charts",
+    response_model=ReportChartsOut,
+    summary="Resumen y gráficos de un reporte (los mismos que llevan el Excel y el PDF)",
+)
+def report_charts(db: DbSession, auth: ReportGenerator, report: ReportKind, filters: Filters) -> ReportChartsOut:
+    built = ReportService(db).build(auth.ctx, report, filters)
+    return ReportChartsOut(
+        title=built.title,
+        rows=len(built.rows),
+        criteria=built.filters,
+        summary=[SummaryItemOut(label=label, value=value) for label, value in built.summary],
+        charts=[
+            ChartOut(
+                title=c.title,
+                kind=c.kind,  # type: ignore[arg-type]
+                unit=c.unit,
+                horizontal=c.horizontal,
+                categories=c.categories,
+                series=[SeriesOut(name=s.name, values=s.values) for s in c.series],
+            )
+            for c in built.charts
+        ],
     )
+
+
+@router.get(
+    "/reports/export",
+    summary="Exportar un reporte en CSV, Excel o PDF (Excel y PDF incluyen resumen y gráficos)",
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {}, "application/pdf": {}}}},
+)
+def export_report(
+    db: DbSession,
+    auth: ReportGenerator,
+    report: ReportKind,
+    filters: Filters,
+    format: Literal["csv", "xlsx", "pdf"] = "xlsx",
+) -> Response:
+    rendered = ReportService(db).export(auth.ctx, report, format, filters)
     return Response(
         content=rendered.content,
         media_type=rendered.media_type,

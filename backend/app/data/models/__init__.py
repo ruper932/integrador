@@ -18,6 +18,7 @@ from app.data.models.iot import (
     Device,
     DeviceCredential,
     DeviceLocation,
+    FirmwareRelease,
     MeasurementBatch,
     Sensor,
     SensorCalibration,
@@ -25,6 +26,7 @@ from app.data.models.iot import (
     SensorType,
 )
 from app.data.models.people import AcademicLevel, Institution, Position, UserDegree, UserProfile
+from app.data.models.relocations import FogCollectorRelocation
 from app.data.models.security import AccountRecoveryRequest, AuditLog, Permission, Role, User, UserSession
 
 __all__ = [
@@ -38,7 +40,9 @@ __all__ = [
     "Device",
     "DeviceCredential",
     "DeviceLocation",
+    "FirmwareRelease",
     "FogCollector",
+    "FogCollectorRelocation",
     "Greenhouse",
     "IncidentReport",
     "InventoryCategory",

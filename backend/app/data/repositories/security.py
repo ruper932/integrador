@@ -102,6 +102,12 @@ class UserSessionRepository(Repository[UserSession]):
 class AuditLogRepository(Repository[AuditLog]):
     model = AuditLog
 
+    def count_since(self, *, action: str, ip: str, since: datetime) -> int:
+        stmt = select(func.count()).where(
+            AuditLog.action == action, AuditLog.ip_address == ip, AuditLog.created_at >= since
+        )
+        return self.session.scalar(stmt) or 0
+
     def distinct_actions(self) -> Sequence[str]:
         return self.session.scalars(select(AuditLog.action).distinct().order_by(AuditLog.action)).all()
 

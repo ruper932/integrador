@@ -21,11 +21,14 @@ from app.presentation.api import (
     analysis,
     auth,
     catalogs,
+    firmware,
     health,
     incidents,
     infrastructure,
     inventory,
     measurements,
+    ml,
+    relocations,
     reports,
     users,
 )
@@ -116,8 +119,11 @@ def create_app() -> FastAPI:
         measurements,
         inventory,
         incidents,
+        relocations,
         reports,
         analysis,
+        firmware,
+        ml,
     ):
         api.include_router(module.router)
     app.include_router(api)

@@ -6,11 +6,12 @@ from sqlalchemy import func, select
 from app.data.models.incidents import IncidentReport
 from app.data.models.inventory import InventoryPeriod, MaintenanceRecord
 from app.data.models.iot import Device, SensorReading
+from app.data.models.relocations import FogCollectorRelocation
 from app.data.models.security import Role, User, user_roles
 from app.demo_data import DEMO_PASSWORD, DemoSeeder, SeedError
 
 
-def test_seed_demo_loads_every_module_and_is_not_repeatable(factory, db, client):
+def test_seed_demo_loads_every_module_and_a_second_run_only_tops_up(factory, db, client):
     factory.user("admin", roles=["administrador"])
     result = DemoSeeder(db).run()
     assert result["usuarios"] == 6
@@ -35,8 +36,15 @@ def test_seed_demo_loads_every_module_and_is_not_repeatable(factory, db, client)
     assert response.status_code == 200
     assert response.json()["user"]["must_change_password"] is False
 
-    with pytest.raises(SeedError):
-        DemoSeeder(db).run()
+    relocations = sorted(db.scalars(select(FogCollectorRelocation.status)))
+    assert relocations == ["finalizado", "pendiente", "rechazado"]
+
+    # Una segunda ejecución no duplica nada: solo completa lecturas (ninguna, se acaban de cargar).
+    readings = db.scalar(select(func.count()).select_from(SensorReading))
+    again = DemoSeeder(db).run()
+    assert again["actualizada"] == 1
+    assert db.scalar(select(func.count()).select_from(SensorReading)) - readings == again["lecturas"] < 100
+    assert db.scalar(select(func.count()).select_from(FogCollectorRelocation)) == 3
 
 
 def test_seed_demo_requires_an_admin(db):

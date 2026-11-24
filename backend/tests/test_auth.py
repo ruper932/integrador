@@ -29,6 +29,7 @@ def test_login_sets_httponly_cookie_and_returns_permissions(client, factory):
         "reportes.consultar",
         "infraestructura.consultar",
         "incidencias.reportar",
+        "reubicaciones.solicitar",
     }
 
 
@@ -106,3 +107,51 @@ def test_temporary_password_forces_change_before_other_operations(make_client, f
     assert first.get("/api/v1/dashboard/summary").status_code == 200
     # Las demás sesiones se invalidan tras el cambio de contraseña.
     assert second.get(ME).status_code == 401
+
+
+def test_session_token_only_travels_in_the_httponly_cookie(client, factory):
+    factory.user("tomas", roles=["docente"])
+    response = client.post(LOGIN, json={"username": "tomas", "password": DEFAULT_PASSWORD})
+    token = response.cookies.get("atrapanieblas_session")
+    assert token and len(token) >= 40
+    cookie = response.headers["set-cookie"].lower()
+    assert "httponly" in cookie and "samesite=strict" in cookie and "path=/api" in cookie
+    # El valor del token no aparece en el cuerpo ni en otras cabeceras, ni en /auth/me
+    assert token not in response.text
+    assert all(token not in v for k, v in response.headers.items() if k.lower() != "set-cookie")
+    assert token not in client.get(ME).text
+
+
+def test_locked_account_answers_like_a_wrong_password(client, factory):
+    factory.user("lucia", roles=["docente"])
+    for _ in range(5):
+        client.post(LOGIN, json={"username": "lucia", "password": "mala-clave-1"})
+    locked = client.post(LOGIN, json={"username": "lucia", "password": DEFAULT_PASSWORD})
+    unknown = client.post(LOGIN, json={"username": "nadie-2", "password": DEFAULT_PASSWORD})
+    assert locked.status_code == unknown.status_code == 401
+    assert locked.json()["error"] == unknown.json()["error"]
+
+
+def test_too_many_failures_from_one_ip_are_throttled(make_client, factory):
+    factory.user("ines", roles=["docente"])
+    attacker = make_client("10.0.0.66")
+    for n in range(20):  # cuentas distintas: el bloqueo por cuenta no lo frenaría
+        assert attacker.post(LOGIN, json={"username": f"cuenta{n}", "password": "x"}).status_code == 401
+    blocked = attacker.post(LOGIN, json={"username": "ines", "password": DEFAULT_PASSWORD})
+    assert blocked.status_code == 429
+    assert blocked.json()["error"]["code"] == "demasiados_intentos"
+    assert "set-cookie" not in blocked.headers
+    # Otro equipo sigue pudiendo entrar
+    assert (
+        make_client("10.0.0.67").post(LOGIN, json={"username": "ines", "password": DEFAULT_PASSWORD}).status_code == 200
+    )
+
+
+def test_login_input_limits_are_validated_without_echoing_input(client):
+    long_user = client.post(LOGIN, json={"username": "u" * 65, "password": "x"})
+    long_pass = client.post(LOGIN, json={"username": "ana", "password": "p" * 129})
+    empty = client.post(LOGIN, json={"username": "", "password": ""})
+    for response in (long_user, long_pass, empty):
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "validacion"
+    assert "p" * 129 not in long_pass.text

@@ -17,6 +17,7 @@ FILTER_LABELS: dict[str, str] = {
     "fog_collector_id": "Atrapanieblas",
     "quality": "Calidad de la lectura",
     "device_status": "Estado del dispositivo",
+    "connection": "Comunicación",
     "category_id": "Categoría",
     "item_id": "Repuesto",
     "condition": "Estado del repuesto",
@@ -62,8 +63,18 @@ MODULE_INVENTORY = "Inventario"
 MODULE_MAINTENANCE = "Mantenimiento"
 MODULE_INCIDENTS = "Reportes de incidencia"
 MODULE_ADMIN = "Usuarios y auditoría"
+MODULE_ANALYSIS = "Análisis estadístico"
 
 REPORTS: tuple[ReportDefinition, ...] = (
+    ReportDefinition(
+        "analisis",
+        MODULE_ANALYSIS,
+        "Análisis estadístico del periodo",
+        "Captación, variables ambientales, correlación con el volumen, calidad de datos y operación "
+        "(cada sección según los permisos del usuario).",
+        (),
+        ("date_range", "fog_collector_id", "device_id"),
+    ),
     ReportDefinition(
         "volumen",
         MODULE_IOT,
@@ -95,7 +106,7 @@ REPORTS: tuple[ReportDefinition, ...] = (
         "Estado de las estaciones",
         "Dispositivos, sensores y última comunicación (al día o desactualizados).",
         (Permission.INFRASTRUCTURE_READ,),
-        ("device_status", "fog_collector_id"),
+        ("device_status", "connection", "fog_collector_id"),
     ),
     ReportDefinition(
         "inventario_stock",

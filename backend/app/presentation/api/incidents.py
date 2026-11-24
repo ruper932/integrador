@@ -1,9 +1,9 @@
 """Endpoints de reportes de incidencia (atención mediante mantenimientos) y notificaciones."""
 
-from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import AwareDatetime
 
 from app.business.services.incident_service import IncidentFilters, IncidentService
 from app.business.services.maintenance_service import UsedPart
@@ -15,6 +15,7 @@ from app.presentation.api.deps import AuthContext, CurrentAuth, DbSession, requi
 from app.presentation.api.inventory import to_maintenance_out
 from app.presentation.schemas.common import Message, Page
 from app.presentation.schemas.incidents import (
+    IncidentAlertsOut,
     IncidentFinishIn,
     IncidentIn,
     IncidentOut,
@@ -97,8 +98,8 @@ def list_incidents(
     device_id: int | None = None,
     reporter_id: int | None = Query(default=None, description="Solo en la vista de todos los reportes"),
     responsible_id: int | None = Query(default=None, description="Personal asignado"),
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: AwareDatetime | None = None,
+    date_to: AwareDatetime | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> Page[IncidentOut]:
@@ -126,6 +127,25 @@ def incidents_summary(db: DbSession, auth: IncidentReader) -> IncidentSummaryOut
     return IncidentSummaryOut(
         mine=summary.mine, open=summary.open, assigned_active=summary.assigned_active, all=summary.all
     )
+
+
+@router.get(
+    "/incidents/alerts",
+    response_model=IncidentAlertsOut,
+    summary="Alertas abiertas avisadas al usuario: altas sin revisar y medias por recordar",
+)
+def incident_alerts(db: DbSession, auth: IncidentReader) -> IncidentAlertsOut:
+    alerts = IncidentService(db).alerts(auth.ctx)
+    return IncidentAlertsOut(
+        blocking=[to_incident_out(r) for r in alerts.blocking],
+        reminders=[to_incident_out(r) for r in alerts.reminders],
+    )
+
+
+@router.post("/incidents/{report_id}/review", response_model=Message, summary="Marcar la alerta como revisada")
+def review_incident_alert(report_id: int, db: DbSession, auth: IncidentReader) -> Message:
+    IncidentService(db).review_alert(auth.ctx, report_id)
+    return Message(message="Alerta revisada.")
 
 
 @router.get("/incidents/{report_id}", response_model=IncidentOut)

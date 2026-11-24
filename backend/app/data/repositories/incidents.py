@@ -107,6 +107,19 @@ class IncidentReportRepository(Repository[IncidentReport]):
         )
         return self.session.scalar(stmt) is not None
 
+    def notified_open(self, user_id: int, *, priority: str, unread_only: bool) -> Sequence[IncidentReport]:
+        """Reportes abiertos de esa prioridad de los que se avisó al usuario, del más antiguo al más reciente."""
+        notified = select(Notification.incident_report_id).where(Notification.user_id == user_id)
+        if unread_only:
+            notified = notified.where(Notification.read_at.is_(None))
+        stmt = (
+            select(IncidentReport)
+            .outerjoin(MaintenanceRecord, MaintenanceRecord.incident_report_id == IncidentReport.id)
+            .where(IncidentReport.id.in_(notified), IncidentReport.priority == priority, MaintenanceRecord.id.is_(None))
+            .order_by(IncidentReport.created_at, IncidentReport.id)
+        )
+        return self.session.scalars(stmt).all()
+
     def count_by_status(
         self, *, reported_by_id: int | None = None, assigned_to_id: int | None = None
     ) -> dict[str, int]:
@@ -135,8 +148,12 @@ class NotificationRepository(Repository[Notification]):
         stmt = select(func.count()).where(Notification.user_id == user_id, Notification.read_at.is_(None))
         return self.session.scalar(stmt) or 0
 
-    def mark_read(self, user_id: int, now: datetime, *, notification_id: int | None = None) -> int:
+    def mark_read(
+        self, user_id: int, now: datetime, *, notification_id: int | None = None, incident_report_id: int | None = None
+    ) -> int:
         stmt = update(Notification).where(Notification.user_id == user_id, Notification.read_at.is_(None))
         if notification_id is not None:
             stmt = stmt.where(Notification.id == notification_id)
+        if incident_report_id is not None:
+            stmt = stmt.where(Notification.incident_report_id == incident_report_id)
         return self.session.execute(stmt.values(read_at=now)).rowcount  # type: ignore[attr-defined]

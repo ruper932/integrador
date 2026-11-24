@@ -128,6 +128,12 @@ class InventoryService:
         item = self.get_item(item_id)
         if "category_id" in data:
             self._check_category(data["category_id"])
+        if data.get("unit") not in (None, item.unit) and self.movements.search(offset=0, limit=1, item_id=item.id)[1]:
+            # Las cantidades históricas quedarían expresadas en otra unidad.
+            raise BusinessRuleError(
+                "No se puede cambiar la unidad de medida de un repuesto que ya tiene movimientos.",
+                code="unidad_con_movimientos",
+            )
         with integrity_guard(self.session, duplicate_message="Ya existe un repuesto con ese código."):
             for key, value in data.items():
                 setattr(item, key, value)

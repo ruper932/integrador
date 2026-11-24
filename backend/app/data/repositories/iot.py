@@ -13,6 +13,7 @@ from app.data.models.iot import (
     Device,
     DeviceCredential,
     DeviceLocation,
+    FirmwareRelease,
     MeasurementBatch,
     Sensor,
     SensorCalibration,
@@ -55,6 +56,10 @@ class DeviceRepository(Repository[Device]):
         last = func.coalesce(Device.last_seen_at, Device.created_at)
         stmt = select(Device).where(Device.status == "activo", last < cutoff).order_by(Device.code)
         return self.session.scalars(stmt).all()
+
+
+class FirmwareReleaseRepository(Repository[FirmwareRelease]):
+    model = FirmwareRelease
 
 
 class DeviceCredentialRepository(Repository[DeviceCredential]):
@@ -191,6 +196,20 @@ class SensorReadingRepository(Repository[SensorReading]):
             .order_by(Sensor.id)
         )
         return [(sensor, count) for sensor, count in self.session.execute(stmt).unique()]
+
+    def valid_points(self, device_id: int, date_from: datetime, date_to: datetime) -> list[tuple[int, datetime, float]]:
+        """Lecturas válidas de un dispositivo en el intervalo, en orden cronológico: (tipo de sensor, fecha, valor)."""
+        stmt = (
+            select(SensorReading.sensor_type_id, SensorReading.measured_at, SensorReading.value)
+            .where(
+                SensorReading.device_id == device_id,
+                SensorReading.quality == "valida",
+                SensorReading.measured_at >= date_from,
+                SensorReading.measured_at <= date_to,
+            )
+            .order_by(SensorReading.measured_at, SensorReading.id)
+        )
+        return [(t, at, float(v)) for t, at, v in self.session.execute(stmt).tuples()]
 
     def latest_valid_per_sensor(self, device_id: int | None = None) -> Sequence[SensorReading]:
         stmt = (

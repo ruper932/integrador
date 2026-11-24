@@ -16,12 +16,24 @@ class NotificationService:
         self.repo = NotificationRepository(session)
 
     def notify(
-        self, user_ids: Iterable[int], title: str, message: str, *, incident_report_id: int | None = None
+        self,
+        user_ids: Iterable[int],
+        title: str,
+        message: str,
+        *,
+        incident_report_id: int | None = None,
+        relocation_id: int | None = None,
     ) -> None:
         """Agrega los avisos a la transacción actual (el llamador hace commit)."""
         for user_id in dict.fromkeys(user_ids):  # sin duplicados, en orden
             self.repo.add(
-                Notification(user_id=user_id, title=title, message=message, incident_report_id=incident_report_id)
+                Notification(
+                    user_id=user_id,
+                    title=title,
+                    message=message,
+                    incident_report_id=incident_report_id,
+                    relocation_id=relocation_id,
+                )
             )
 
     def list(self, user_id: int, *, limit: int, unread_only: bool) -> tuple[Sequence[Notification], int]:
@@ -34,6 +46,10 @@ class NotificationService:
             raise NotFoundError("Notificación no encontrada.")
         self.repo.mark_read(user_id, utcnow(), notification_id=notification_id)
         self.session.commit()
+
+    def mark_incident_read(self, user_id: int, incident_report_id: int) -> int:
+        """Marca como leídos los avisos del usuario sobre ese reporte (el llamador hace commit)."""
+        return self.repo.mark_read(user_id, utcnow(), incident_report_id=incident_report_id)
 
     def mark_all_read(self, user_id: int) -> int:
         count = self.repo.mark_read(user_id, utcnow())

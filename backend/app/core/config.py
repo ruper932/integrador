@@ -1,8 +1,9 @@
 """Configuración central de la aplicación, cargada desde variables de entorno."""
 
 from functools import lru_cache
+from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +28,9 @@ class Settings(BaseSettings):
     # Protección de inicio de sesión
     login_max_failed_attempts: int = 5
     login_lockout_minutes: int = 15
+    # Límite por equipo (IP): frena que se prueben muchas cuentas desde un mismo equipo.
+    login_max_failed_per_ip: int = 20
+    login_ip_window_minutes: int = 15
 
     # Límites de solicitudes de recuperación de cuenta
     recovery_max_per_ip_per_hour: int = 5
@@ -47,6 +51,18 @@ class Settings(BaseSettings):
     auto_incident_offline_hours: int = Field(default=6, ge=1)
     auto_incident_anomaly_window_hours: int = Field(default=24, ge=1)
     auto_incident_anomaly_threshold: int = Field(default=10, ge=1)
+
+    # Bootloader, tabla de particiones y boot_app0 para la primera instalación por USB (ver firmware_base/README.md).
+    firmware_base_dir: Path = Path(__file__).resolve().parents[2] / "firmware_base"
+    # Datos que la primera instalación precarga en cada estación. La contraseña Wi-Fi se envía solo al
+    # ESP32 (por el puerto serie): nunca se muestra en pantalla ni se registra.
+    station_wifi_ssid: str = ""
+    station_wifi_password: SecretStr = SecretStr("")
+    station_api_url: str = ""  # p. ej. http://192.168.1.10/api/v1/iot/measurements/batch
+    station_ntp_server: str = ""  # servidor de hora de la red local
+
+    # Modelo de ML (provisional: entrenado con datos simulados). Se carga desde la carpeta controlada de artefactos.
+    ml_artifact_path: Path = Path(__file__).resolve().parents[2] / "artifacts" / "modelo_sim-0.1.0.joblib"
 
 
 @lru_cache
