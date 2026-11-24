@@ -7,17 +7,22 @@
 //     reenvían al restablecerse. Cada lectura lleva un message_id único (sin duplicados).
 //  3. Variables no medidas (sensor ausente o fallido) se envían como null, nunca como 0.
 //  4. El volumen se envía como valor INCREMENTAL: litros captados desde la lectura anterior.
+//  5. La respuesta de cada lote trae el intervalo de muestreo elegido en el sistema web; si cambió, se
+//     aplica desde el ciclo siguiente y se guarda en la memoria no volátil.
+//  6. Tras cada muestreo (y como máximo una vez por hora) consulta si el sistema le asignó otra versión
+//     de firmware; si es así la descarga, el cliente verifica el MD5, la instala y reinicia (OTA).
 
-#include <Adafruit_BMP280.h>
-#include <Adafruit_SHT31.h>
 #include <ArduinoJson.h>
+#include <BME280I2C.h>
 #include <HTTPClient.h>
+#include <HTTPUpdate.h>
 #include <WiFi.h>
 #include <Wire.h>
 #include <time.h>
 
 #include "buffer.h"
 #include "config.h"
+#include "dht_sensor.h"
 
 #ifndef HAS_FOG_SENSOR
 #define HAS_FOG_SENSOR 0
@@ -26,18 +31,24 @@
 constexpr int PIN_STATUS_LED = 2;
 constexpr size_t BATCH_SIZE = 50;
 constexpr uint32_t COMM_LOSS_WARNING_MS = 30UL * 60UL * 1000UL;
+constexpr uint32_t FIRMWARE_CHECK_MS = 60UL * 60UL * 1000UL;
+
+// Marca que el servidor busca en el firmware.bin para conocer su versión (se imprime al arrancar,
+// así el enlazador la conserva).
+static const char FIRMWARE_MARKER[] = "ATINA-FW:" FIRMWARE_VERSION ";";
 
 static StationConfig cfg;
-static Adafruit_SHT31 sht31;
-static Adafruit_BMP280 bmp;
-static bool hasSht31 = false;
-static bool hasBmp = false;
+static BME280I2C bme;  // dirección 0x76 (SDO a GND)
+static bool hasBme = false;
+static bool bmeHasHumidity = false;  // los módulos BMP280 vendidos como BME280 no miden humedad
 
 static volatile uint32_t pulseCount = 0;
 static volatile uint32_t lastPulseMs = 0;
 static uint32_t lastSampleMs = 0;
 static uint32_t lastSuccessMs = 0;
 static uint32_t lastWifiAttemptMs = 0;
+static uint32_t lastFirmwareCheckMs = 0;
+static bool firmwareChecked = false;
 
 void IRAM_ATTR onPulse() {
   uint32_t now = millis();
@@ -101,6 +112,29 @@ static float readTankLevelCm() {
   return level < 0 ? NAN : level;
 }
 
+// Comando `sensores` (consola serie): ayuda a revisar el cableado en el sitio.
+void printSensorDiagnostics() {
+  Serial.print("[DIAG] I2C (SDA 27, SCL 26), direcciones que responden:");
+  int found = 0;
+  for (uint8_t address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    if (Wire.endTransmission() == 0) {
+      Serial.printf(" 0x%02X", address);
+      found++;
+    }
+  }
+  Serial.println(found ? "  (el BME280 debe ser 0x76 o 0x77)" : " ninguna: revise SDA, SCL, 3V3 y GND del BME280");
+  pinMode(PIN_DHT, INPUT_PULLUP);
+  delay(2);
+  int idle = digitalRead(PIN_DHT);
+  float t = NAN, h = NAN;
+  bool ok = readDht(PIN_DHT, DHT_TYPE, t, h);
+  Serial.printf("[DIAG] DHT (GPIO %d): línea en reposo %s; lectura %s", PIN_DHT, idle ? "ALTA (bien)" : "BAJA (DATA a GND o sensor sin alimentación)",
+                ok ? "correcta" : "sin respuesta");
+  if (ok) Serial.printf(": %.1f C, %.0f %%", t, h);
+  Serial.println();
+}
+
 static void sample() {
   if (!timeIsSynced()) {
     // Sin hora válida no se registran lecturas; los pulsos de volumen se siguen acumulando.
@@ -109,13 +143,23 @@ static void sample() {
   }
   String ts = isoNowUtc();
 
-  float t = hasSht31 ? sht31.readTemperature() : NAN;
-  float h = hasSht31 ? sht31.readHumidity() : NAN;
-  queueReading(SENSOR_TEMP, t, hasSht31, "C", ts);
-  queueReading(SENSOR_HUM, h, hasSht31, "%", ts);
+  // BME280 primero (más preciso y mide hasta 100 % de humedad); el DHT11 cubre si el BME280 falla.
+  float bmeP = NAN, bmeT = NAN, bmeH = NAN;
+  if (hasBme) bme.read(bmeP, bmeT, bmeH, BME280::TempUnit_Celsius, BME280::PresUnit_hPa);
+  if (isnan(bmeT)) {
+    hasBme = bme.begin();  // conexión floja o sensor reiniciado: se reintenta en el próximo ciclo
+    bmeP = bmeH = NAN;
+  }
+  if (!bmeHasHumidity) bmeH = NAN;
+  float dhtT = NAN, dhtH = NAN;
+  readDht(PIN_DHT, DHT_TYPE, dhtT, dhtH);
 
-  float p = hasBmp ? bmp.readPressure() / 100.0f : NAN;
-  queueReading(SENSOR_PRESSURE, p, hasBmp, "hPa", ts);
+  queueReading(SENSOR_TEMP, isnan(bmeT) ? dhtT : bmeT, true, "C", ts);
+  queueReading(SENSOR_HUM, isnan(bmeH) ? dhtH : bmeH, true, "%", ts);
+  queueReading(SENSOR_PRESSURE, bmeP, true, "hPa", ts);
+  if (isnan(bmeT) || isnan(dhtH)) {
+    Serial.printf("[AVISO] BME280: %s, DHT11: %s\n", isnan(bmeT) ? "sin lectura" : "ok", isnan(dhtH) ? "sin lectura" : "ok");
+  }
 
   noInterrupts();
   uint32_t pulses = pulseCount;
@@ -136,10 +180,24 @@ static void sample() {
 
 static void ensureWifi() {
   if (WiFi.status() == WL_CONNECTED) return;
-  if (millis() - lastWifiAttemptMs < 30000) return;
+  // El primer intento es inmediato; luego, uno cada 30 s mientras no haya conexión.
+  if (lastWifiAttemptMs != 0 && millis() - lastWifiAttemptMs < 30000) return;
   lastWifiAttemptMs = millis();
   Serial.println("[INFO] Conectando a WiFi…");
   WiFi.begin(cfg.wifiSsid.c_str(), cfg.wifiPassword.c_str());
+}
+
+// Aplica el intervalo de muestreo que el servidor indica en la respuesta del lote.
+static void applySampleInterval(const String &response) {
+  JsonDocument filter;
+  filter["sample_interval_s"] = true;
+  JsonDocument doc;
+  if (deserializeJson(doc, response, DeserializationOption::Filter(filter)) != DeserializationError::Ok) return;
+  uint32_t seconds = doc["sample_interval_s"] | 0u;
+  if (seconds < MIN_SAMPLE_SECONDS || seconds > MAX_SAMPLE_SECONDS || seconds == cfg.sampleSeconds) return;
+  cfg.sampleSeconds = seconds;
+  saveConfig(cfg);
+  Serial.printf("[INFO] Intervalo de muestreo actualizado por el servidor: %u s\n", (unsigned)seconds);
 }
 
 static bool sendPending() {
@@ -168,9 +226,11 @@ static bool sendPending() {
   http.addHeader("X-Device-Id", cfg.deviceId);
   http.addHeader("X-Device-Key", cfg.deviceKey);
   int status = http.POST(body);
+  String response = status == 200 ? http.getString() : String();
   http.end();
 
   if (status == 200) {
+    applySampleInterval(response);
     // El servidor confirmó el lote (aceptadas, observadas, rechazadas o duplicadas): se eliminan de la cola.
     pending::drop(n);
     lastSuccessMs = millis();
@@ -186,6 +246,31 @@ static bool sendPending() {
   // 401/403 (credencial o dispositivo inactivo), 5xx o sin respuesta: se conservan y se reintenta.
   Serial.printf("[AVISO] Envío fallido (HTTP %d). Se reintentará.\n", status);
   return false;
+}
+
+// Actualización OTA desde la API local. 304: nada que instalar; 200: imagen nueva (se reinicia al terminar).
+static void checkFirmware() {
+  int cut = cfg.apiUrl.indexOf("/measurements/batch");
+  if (cut < 0) {
+    Serial.println("[AVISO] api_url no termina en /measurements/batch; no se consultan actualizaciones.");
+    return;
+  }
+  HTTPClient http;
+  http.setTimeout(30000);
+  http.begin(cfg.apiUrl.substring(0, cut) + "/firmware");
+  http.addHeader("X-Device-Id", cfg.deviceId);
+  http.addHeader("X-Device-Key", cfg.deviceKey);
+  Serial.println("[INFO] Consultando actualizaciones de firmware…");
+  switch (httpUpdate.update(http, FIRMWARE_VERSION)) {
+    case HTTP_UPDATE_NO_UPDATES:
+      Serial.println("[INFO] Firmware al día.");
+      break;
+    case HTTP_UPDATE_OK:  // no se llega: el ESP32 se reinicia con la versión nueva
+      break;
+    case HTTP_UPDATE_FAILED:
+      Serial.printf("[AVISO] Actualización fallida: %s. Se reintentará.\n", httpUpdate.getLastErrorString().c_str());
+      break;
+  }
 }
 
 static void reportCommunicationState() {
@@ -219,10 +304,16 @@ void setup() {
     }
   }
 
-  Wire.begin();
-  hasSht31 = sht31.begin(0x44);
-  hasBmp = bmp.begin(0x76);
-  Serial.printf("[INFO] SHT31: %s, BMP280: %s\n", hasSht31 ? "ok" : "no detectado", hasBmp ? "ok" : "no detectado");
+  Serial.printf("[INFO] %s\n", FIRMWARE_MARKER);
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  hasBme = bme.begin();
+  bmeHasHumidity = hasBme && bme.chipModel() == BME280::ChipModel_BME280;
+  float probeT, probeH;
+  delay(1000);  // el DHT11 necesita ~1 s tras encenderse
+  bool hasDht = readDht(PIN_DHT, DHT_TYPE, probeT, probeH);
+  Serial.printf("[INFO] BME280: %s, DHT11: %s\n",
+                hasBme ? (bmeHasHumidity ? "ok" : "ok (BMP280, sin humedad)") : "no detectado",
+                hasDht ? "ok" : "no detectado");
 
   WiFi.mode(WIFI_STA);
   ensureWifi();
@@ -234,13 +325,23 @@ void loop() {
   handleSerialConfig(cfg);
   ensureWifi();
 
+  bool sampled = false;
   if (millis() - lastSampleMs >= cfg.sampleSeconds * 1000UL || lastSampleMs == 0) {
     lastSampleMs = millis();
     sample();
+    sampled = true;
   }
   // Vacía la cola en lotes sucesivos mientras haya conexión.
   while (sendPending()) {
     delay(100);
+  }
+  // Justo después de muestrear: si se reinicia por una actualización, solo se pierden los pulsos de
+  // volumen de esos segundos (la cola pendiente está en LittleFS y sobrevive al reinicio).
+  if (sampled && WiFi.status() == WL_CONNECTED &&
+      (!firmwareChecked || millis() - lastFirmwareCheckMs >= FIRMWARE_CHECK_MS)) {
+    firmwareChecked = true;
+    lastFirmwareCheckMs = millis();
+    checkFirmware();
   }
   reportCommunicationState();
   delay(200);

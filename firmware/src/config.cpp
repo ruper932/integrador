@@ -37,6 +37,10 @@ bool handleSerialConfig(StationConfig &cfg) {
   line.trim();
   if (line.isEmpty()) return false;
 
+  if (line == "sensores") {
+    printSensorDiagnostics();
+    return false;
+  }
   if (line == "show") {
     Serial.printf("ssid=%s api_url=%s device_id=%s ntp=%s sample_s=%u device_key=%s\n", cfg.wifiSsid.c_str(),
                   cfg.apiUrl.c_str(), cfg.deviceId.c_str(), cfg.ntpServer.c_str(), cfg.sampleSeconds,
@@ -70,7 +74,7 @@ bool handleSerialConfig(StationConfig &cfg) {
     else if (key == "device_id") cfg.deviceId = value;
     else if (key == "device_key") cfg.deviceKey = value;
     else if (key == "ntp") cfg.ntpServer = value;
-    else if (key == "sample_s") cfg.sampleSeconds = max(30L, value.toInt());
+    else if (key == "sample_s") cfg.sampleSeconds = constrain(value.toInt(), (long)MIN_SAMPLE_SECONDS, (long)MAX_SAMPLE_SECONDS);
     else {
       Serial.println("Clave desconocida.");
       return false;
@@ -78,6 +82,6 @@ bool handleSerialConfig(StationConfig &cfg) {
     Serial.printf("%s actualizado (escriba `save` para guardar).\n", key.c_str());
     return false;
   }
-  Serial.println("Comandos: show | set <clave> <valor> | save | clear");
+  Serial.println("Comandos: show | sensores | set <clave> <valor> | save | clear");
   return false;
 }
