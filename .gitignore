@@ -35,3 +35,9 @@ logs/
 
 # Respaldos temporales de draw.io Desktop
 *.drawio.bkp
+
+# Certificado HTTPS de la institución (la clave privada nunca se versiona)
+deployment/certs/
+
+# Informe y documentos de trabajo (Word/PDF pesados y respaldos): se guardan fuera del repositorio
+docs/Documentos/
