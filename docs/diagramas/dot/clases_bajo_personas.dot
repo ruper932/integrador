@@ -1,0 +1,17 @@
+digraph G {
+  graph [rankdir=TB, bgcolor="white", pad=0.3, nodesep=0.35, ranksep=0.7, splines=true, fontname="DejaVu Sans"];
+  node [shape=plain, fontname="DejaVu Sans", fontsize=12, color="#2B4D3B"];
+  edge [color="#55675C", fontname="DejaVu Sans", fontsize=11, fontcolor="#2B4D3B", arrowsize=0.8];
+  graph [nodesep=0.2, ranksep=0.55];
+  "user_profiles" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>UserProfile</b></td></tr><tr><td align="left" balign="left">+ user_id: int {PK}<br/>+ first_names: str<br/>+ paternal_surname: str [0..1]<br/>+ maternal_surname: str [0..1]<br/>+ ci_number: str [0..1]<br/>+ ci_complement: str [0..1]<br/>+ ci_issued_in: str [0..1]<br/>+ institutional_email: str [0..1]<br/>+ personal_email: str [0..1]<br/>+ mobile_phone: str [0..1]<br/>+ birth_date: date [0..1]<br/>+ address: str [0..1]<br/>+ position_id: int [0..1] {FK}<br/>+ created_at: datetime<br/>+ updated_at: datetime</td></tr><tr><td align="left" balign="left">+ full_name(): str<br/>+ is_complete(): bool</td></tr></table>>];
+  "user_degrees" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>UserDegree</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ user_id: int {FK}<br/>+ academic_level_id: int {FK}<br/>+ title: str<br/>+ institution_id: int {FK}<br/>+ graduation_year: int [0..1]<br/>+ created_at: datetime<br/>+ updated_at: datetime</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "positions" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Position</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ code: str<br/>+ name: str<br/>+ is_active: bool</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "academic_levels" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>AcademicLevel</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ code: str<br/>+ name: str<br/>+ sort_order: int<br/>+ min_graduation_age: int</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "institutions" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Institution</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ name: str<br/>+ acronym: str [0..1]<br/>+ institution_type: str<br/>+ city: str [0..1]<br/>+ is_active: bool<br/>+ created_at: datetime<br/>+ updated_at: datetime</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "user_profiles" -> "users" [arrowhead=none, taillabel="0..1", headlabel="1", label="", labelfontsize=11];
+  "user_profiles" -> "positions" [arrowhead=none, taillabel="*", headlabel="0..1", label="", labelfontsize=11];
+  "user_degrees" -> "users" [arrowhead=none, taillabel="*", headlabel="1", label="", labelfontsize=11];
+  "user_degrees" -> "academic_levels" [arrowhead=none, taillabel="*", headlabel="1", label="", labelfontsize=11];
+  "user_degrees" -> "institutions" [arrowhead=none, taillabel="*", headlabel="1", label="", labelfontsize=11];
+  "users" [label=<<table border="1" cellborder="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td><b>User</b><br/><font point-size="8" color="#55675C">(otro módulo)</font></td></tr></table>>];
+}

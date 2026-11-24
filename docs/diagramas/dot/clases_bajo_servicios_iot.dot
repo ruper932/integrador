@@ -1,0 +1,17 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.3, nodesep=0.35, ranksep=0.7, splines=true, fontname="DejaVu Sans"];
+  node [shape=plain, fontname="DejaVu Sans", fontsize=12, color="#2B4D3B"];
+  edge [color="#55675C", fontname="DejaVu Sans", fontsize=11, fontcolor="#2B4D3B", arrowsize=0.8];
+  graph [nodesep=0.25, ranksep=0.4];
+  "DeviceService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>DeviceService</b></td></tr><tr><td align="left" balign="left">+ list(status, fog_collector_id)<br/>+ get(device_id)<br/>+ current_location(device_id)<br/>+ follow_fog_collector(fog_collector_id, location_id)<br/>+ create(data)<br/>+ update(device_id, data)<br/>+ deactivate(device_id)<br/>+ rotate_key(device_id)</td></tr></table>>];
+  "SensorService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>SensorService</b></td></tr><tr><td align="left" balign="left">+ list_types()<br/>+ list(device_id, status)<br/>+ get(sensor_id)<br/>+ create(data)<br/>+ update(sensor_id, data)<br/>+ deactivate(sensor_id)</td></tr></table>>];
+  "DeviceAuthService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>DeviceAuthService</b></td></tr><tr><td align="left" balign="left">+ authenticate(device_code, api_key, ip)</td></tr></table>>];
+  "IngestionService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>IngestionService</b></td></tr><tr><td align="left" balign="left">+ ingest(device, batch_uid, sent_at, …)</td></tr></table>>];
+  "MeasurementService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>MeasurementService</b></td></tr><tr><td align="left" balign="left">+ search(filters)<br/>+ live(device_id, minutes)<br/>+ summary()<br/>+ series(sensor_type_code, bucket, date_from, …)</td></tr></table>>];
+  "FirmwareService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>FirmwareService</b></td></tr><tr><td align="left" balign="left">+ list_releases()<br/>+ upload(image, notes)<br/>+ assign(release_id, device_ids)<br/>+ pending_for(device, running_version)</td></tr></table>>];
+  { rank=same; "DeviceService"; "SensorService"; "DeviceAuthService"; }
+  { rank=same; "IngestionService"; "MeasurementService"; "FirmwareService"; }
+  "DeviceService" -> "IngestionService" [style=invis];
+  "SensorService" -> "MeasurementService" [style=invis];
+  "DeviceAuthService" -> "FirmwareService" [style=invis];
+}

@@ -155,6 +155,38 @@ Registro de decisiones tomadas durante la implementación. Cada una puede revisa
 - PDF: ancho de columnas según el contenido (sin cortar palabras del encabezado) y letra menor en
   reportes con muchas columnas.
 
+## Módulo provisional de estimación (ML)
+
+- A pedido del usuario, un módulo **provisional** usa el único modelo (`sim-0.1.0`, entrenado con datos
+  simulados) con las lecturas reales de las estaciones conectadas. Está marcado en el código
+  (`PROVISIONAL` en `app/business/ml/prediction_service.py`) y en la interfaz; no sustituye las fases
+  9–11 ni ocupa sus rutas (`/predictions`).
+- Horizonte, el mismo de la simulación: volumen del día D+1 con el día D completo. Con datos en vivo,
+  D es ayer y se estima hoy; se muestra junto a lo captado hoy hasta el momento y a la media de 7 días,
+  que en la simulación fue igual o mejor que el modelo.
+- Las estimaciones se calculan al consultar y **no se guardan**: registrar predicciones (tablas
+  `ml_models`/`predictions`) y compararlas con el volumen real queda para el modelo de producción.
+- El volumen se normaliza al área de malla de entrenamiento (40 m²): en los datos sintéticos el volumen
+  es proporcional al área.
+- scikit-learn se fija en la misma versión del entrenamiento: un artefacto de joblib de otra versión
+  se rechaza en lugar de dar resultados silenciosamente distintos.
+
+## Carga de firmware (OTA)
+
+- Las estaciones se actualizan **por la red local, por pedido del propio ESP32** (HTTPUpdate de
+  Arduino): consultan `GET /api/v1/iot/firmware` con su credencial; el servidor no "empuja" nada.
+  Se eligió frente a programar por USB desde el navegador porque las estaciones están en el campo y
+  porque no requiere tecnologías nuevas (sin Web Serial ni esptool-js).
+- La versión se **lee del archivo** (marca `ATINA-FW:<versión>;`) para que coincida siempre con la
+  que informa el ESP32 y no haya bucles de reinstalación.
+- La imagen se guarda en PostgreSQL y entra en los respaldos. Se verifica que sea una imagen de
+  ESP32 y que quepa en una ranura OTA de la tabla de particiones por defecto (1,25 MB).
+- Integridad: el ESP32 verifica el MD5 de la imagen. **Limitación:** la descarga va por HTTP sin
+  firma, igual que el resto de la comunicación IoT del proyecto. Alguien con acceso a la red local
+  podría interceptarla; para evitarlo haría falta firmar las imágenes (Secure Boot u OTA firmada).
+- No hay retroceso automático si una versión arranca pero funciona mal: por eso conviene asignarla
+  primero a una estación de prueba. Se puede volver atrás asignando la versión anterior.
+
 ## Mediciones
 
 - **Volumen captado: incremental.** Cada lectura son los litros captados desde la anterior. Las
@@ -211,3 +243,28 @@ Registro de decisiones tomadas durante la implementación. Cada una puede revisa
 
 - Gráficos sin animación (equipos modestos; además evita un fallo de renderizado observado).
 - Una serie por gráfico y un único eje Y.
+
+## Estado del componente después de un mantenimiento
+
+- El estado final de un mantenimiento (registro directo o al finalizar una incidencia) se aplica al sensor
+  atendido, o al dispositivo si no se indicó sensor: «fuera de servicio» → `mantenimiento`, «reemplazado» →
+  `inactivo`, «operativo» (con o sin observaciones) → `activo` solo si estaba en `mantenimiento`. Un componente
+  `inactivo` lo reactiva el administrador, porque la unidad nueva conserva el código del sensor. Cada cambio se
+  audita (`sensor.estado_por_mantenimiento` / `dispositivo.estado_por_mantenimiento`).
+- La estimación provisional de ML sigue visible para cualquier usuario autenticado, por decisión del usuario.
+
+## Primera instalación del ESP32 desde el navegador (2026-11-19, aprobado por el usuario)
+
+- Se agrega `esptool-js` 0.7.0 (biblioteca oficial de Espressif, versión fija) para escribir el ESP32 por USB con
+  Web Serial, sin instalar herramientas en la PC. Se descarga solo al usarla (no pesa en el resto del sistema) y
+  funciona sin Internet (incluye sus propios cargadores).
+- Web Serial exige página segura: Nginx sirve el sistema por **HTTPS (443)** con un certificado propio de la
+  institución (`deployment/scripts/generar-certificado.sh`). El puerto **80** queda solo para las estaciones,
+  que siguen enviando por HTTP; los navegadores se redirigen a HTTPS. `COOKIE_SECURE` pasa a `true`.
+- Al instalar se emite una API key nueva (la anterior queda revocada) y el navegador la envía directo al ESP32 por
+  el puerto serie: no se muestra ni se registra. La contraseña Wi-Fi tampoco se guarda en el servidor. La versión
+  instalada queda asignada para que la actualización por red no la repita. Se audita
+  `firmware.primera_instalacion` y `dispositivo.rotar_credencial`.
+- Bootloader, particiones y boot_app0 se versionan en `backend/firmware_base/` (fijos para `espressif32@6.9.0`,
+  `esp32dev`, particiones por defecto con dos ranuras OTA).
+

@@ -93,6 +93,7 @@ Queda fuera del alcance:
 - Vitest.
 - React Testing Library.
 - Playwright.
+- esptool-js (versión fija 0.7.0, aprobada el 2026-11-19): solo para la primera instalación del ESP32 por USB desde el navegador (Web Serial). Se carga bajo demanda y funciona sin Internet.
 
 ### Machine learning
 
@@ -108,6 +109,7 @@ Debe existir un único modelo de machine learning para la predicción del volume
 - openpyxl para Excel.
 - ReportLab para PDF.
 - Exportación CSV cuando corresponda.
+- Excel y PDF incluyen el resumen y los gráficos del reporte (gráficos nativos de Excel y vectoriales en PDF, nunca capturas de pantalla); el CSV lleva solo los datos.
 
 ### IoT
 
@@ -115,11 +117,12 @@ Debe existir un único modelo de machine learning para la predicción del volume
 - PlatformIO.
 - Framework Arduino.
 - Comunicación HTTP/JSON hacia la API local.
+- Lector propio del DHT11/DHT22 (`firmware/src/dht_sensor.cpp`), con límite de tiempo por pulso; reconoce el formato DHT11 o DHT22 por el contenido.
 
 ### Despliegue
 
 - Docker Compose.
-- Nginx.
+- Nginx: HTTPS en el puerto 443 para el sistema web, con certificado propio de la institución (`deployment/scripts/generar-certificado.sh`, sin Internet); el puerto 80 queda solo para las estaciones ESP32 y redirige los navegadores a HTTPS.
 - Servidor local institucional.
 - PostgreSQL.
 
@@ -239,6 +242,9 @@ Reglas:
 - El sistema debe prevenir duplicados mediante un identificador único de mensaje o lote.
 - Si el ESP32 pierde conexión, debe conservar temporalmente las mediciones y reenviarlas al restablecerse la conexión.
 - El dashboard debe mostrar la fecha de la última comunicación y advertir datos desactualizados.
+- Existe una sola regla de conexión para todo el sistema (`backend/app/business/rules/connection.py`): una estación pierde la conexión cuando pasan 3 intervalos de envío (`sample_interval_s`) más 60 s sin comunicarse, con `DEVICE_STALE_MINUTES` como tope. Ningún módulo debe calcular la conexión por su cuenta.
+- Toda pantalla que muestre la conexión de las estaciones debe refrescarse periódicamente (30 s). Toda acción que cambie el estado de una estación o sensor (activar/desactivar, estado final de un mantenimiento o incidencia, intervalo de envío, firmware) debe avisar a los demás módulos con `refreshStations` (`frontend/src/features/devices/api.ts`).
+- Un sensor ausente o mal conectado no debe detener ni reiniciar el ESP32: su lectura se envía como `null`.
 
 ### 3. Volumen de agua captada
 
@@ -284,6 +290,10 @@ El sistema debe permitir:
 - Exportar reportes en CSV, Excel o PDF.
 
 Los reportes deben generarse desde el backend. El frontend solo solicita y descarga el archivo.
+
+- Cada reporte calcula su resumen y sus gráficos a partir de sus mismas filas (`report_charts.py`), así la pantalla, el Excel y el PDF coinciden con el detalle exportado.
+- Los módulos muestran esos gráficos con `GET /api/v1/reports/charts` (mismos filtros y permisos que la exportación; no se registra como exportación en auditoría).
+- El análisis estadístico también se exporta (`report=analisis`), con cada sección según los permisos del usuario.
 
 ### 6. Inventario de repuestos IoT
 
@@ -457,6 +467,10 @@ Reglas:
 - El firmware debe conservar temporalmente las mediciones cuando no haya conexión con el servidor.
 - Al restablecerse la conexión, el ESP32 debe reenviar las mediciones pendientes.
 - El firmware debe informar pérdida de comunicación o lecturas desactualizadas.
+- La primera instalación por USB desde el navegador emite una API key nueva (la anterior queda revocada) y la envía directamente al ESP32 por el puerto serie: nunca se muestra en pantalla ni se registra.
+- La contraseña Wi-Fi precargada (`STATION_WIFI_PASSWORD` en `.env`) solo se envía al ESP32; la API no la devuelve en ninguna consulta.
+- Antes de instalar por USB una versión nueva, debe cargarse y asignarse en el sistema, para que la actualización por red no vuelva a una versión anterior.
+- Cada versión cargada debe aumentar `FIRMWARE_VERSION` en `firmware/include/config.h`.
 
 ### Seguridad del servidor local
 
@@ -470,6 +484,7 @@ Reglas:
 - No exponer credenciales, secretos ni claves en el repositorio.
 - Usar variables de entorno y `.env` excluido del control de versiones.
 - Incluir `.env.example` con nombres de variables, pero sin valores reales.
+- El servidor debe tener una IP fija o una reserva en el router: las estaciones envían a una dirección fija y un cambio de IP las deja sin comunicación.
 
 ## Validación de datos
 
@@ -550,6 +565,17 @@ GET    /api/v1/predictions
 GET    /api/v1/predictions/comparison
 
 GET    /api/v1/reports/export
+GET    /api/v1/reports/charts
+
+GET    /api/v1/firmware/releases
+POST   /api/v1/firmware/releases
+PUT    /api/v1/firmware/assignments
+GET    /api/v1/firmware/releases/{id}/flash-plan
+GET    /api/v1/firmware/releases/{id}/image
+GET    /api/v1/firmware/base/{name}
+GET    /api/v1/firmware/station-defaults
+POST   /api/v1/firmware/first-install
+GET    /api/v1/iot/firmware
 
 GET    /api/v1/inventory/categories
 POST   /api/v1/inventory/categories

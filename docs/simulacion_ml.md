@@ -78,6 +78,13 @@ Totales mensuales (real vs. estimado, en litros):
 - Pendiente de decidir: horizonte, variables disponibles según los sensores instalados, frecuencia
   de reentrenamiento (controlado y documentado) y umbral mínimo de datos.
 
+## Código compartido con la API
+
+La preparación de variables (`build_daily`) y las reglas de inferencia (`predict`) están en
+`backend/app/business/ml/` y la simulación las importa. Así el entrenamiento y el módulo provisional
+«Estimación de volumen» calculan las variables con el mismo código. Para publicar un artefacto
+entrenado, copiarlo a `backend/artifacts/`.
+
 ## Cómo reproducir
 
 ```bash

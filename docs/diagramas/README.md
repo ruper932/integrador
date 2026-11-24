@@ -48,3 +48,10 @@ env -u ELECTRON_RUN_AS_NODE drawio -x -f png -p 4 -s 1.5 -o clases_usuarios.png 
 | CU-M5 | Reportes | Director/docente, Administrador |
 | CU-M6 | Inventario de repuestos (sistema periódico) | Administrador, Director/docente, Técnico de mantenimiento |
 | CU-M7 | Mantenimiento | Técnico de mantenimiento, Administrador, Director/docente |
+
+## Diagramas PERT (`pert.drawio`)
+
+Una página con el PERT general del proyecto (los siete sprints y la adquisición de componentes) y una página por
+sprint. Cada nodo muestra ES/te/EF y LS/H/LF; la ruta crítica va en rojo y la tabla de cada página lista las
+estimaciones a, m y b con te = (a + 4m + b) / 6. El valor m de las tareas con historia de usuario es la estimación
+del Product Backlog; la duración de cada sprint en el PERT general es la ruta crítica de su propia página.

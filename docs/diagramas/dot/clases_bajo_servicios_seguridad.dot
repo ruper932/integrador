@@ -1,0 +1,15 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.3, nodesep=0.35, ranksep=0.7, splines=true, fontname="DejaVu Sans"];
+  node [shape=plain, fontname="DejaVu Sans", fontsize=12, color="#2B4D3B"];
+  edge [color="#55675C", fontname="DejaVu Sans", fontsize=11, fontcolor="#2B4D3B", arrowsize=0.8];
+  graph [nodesep=0.25, ranksep=0.4];
+  "AuthService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>AuthService</b></td></tr><tr><td align="left" balign="left">+ login(username, password)<br/>+ authenticate(token)<br/>+ logout(user_session)<br/>+ change_password(user, current_session, current_password, …)</td></tr></table>>];
+  "UserService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>UserService</b></td></tr><tr><td align="left" balign="left">+ list(offset, limit, is_active, …)<br/>+ get(user_id)<br/>+ create(username, role_ids, profile, …)<br/>+ update(user_id, role_ids, is_active, …)<br/>+ update_own_profile(user, profile, degrees)<br/>+ deactivate(user_id)<br/>+ reset_password(user_id, new_password)<br/>+ apply_password_reset(user, new_password)</td></tr></table>>];
+  "RoleService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>RoleService</b></td></tr><tr><td align="left" balign="left">+ list_roles()<br/>+ list_permissions()<br/>+ create(name, description, permission_codes)<br/>+ update(role_id, description, permission_codes)</td></tr></table>>];
+  "RecoveryService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>RecoveryService</b></td></tr><tr><td align="left" balign="left">+ submit(username, message)<br/>+ list(offset, limit, status)<br/>+ approve(request_id, identity_verified, verification_note, …)<br/>+ reject(request_id, reason)</td></tr></table>>];
+  "AuditService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>AuditService</b></td></tr><tr><td align="left" balign="left">+ record(action, entity_type, entity_id, …)<br/>+ search(offset, limit, user_id, …)</td></tr></table>>];
+  { rank=same; "AuthService"; "UserService"; "RoleService"; }
+  { rank=same; "RecoveryService"; "AuditService"; }
+  "AuthService" -> "RecoveryService" [style=invis];
+  "UserService" -> "AuditService" [style=invis];
+}

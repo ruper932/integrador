@@ -1,12 +1,23 @@
 # Visual — Style Reference
 
-> **Vigente desde 2026-10-20: estilo pastel sobrio.** Esta sección manda sobre todo lo que sigue.
+> **Vigente desde 2026-10-20: estilo pastel sobrio** (paleta verde y crema desde 2026-11-18). Esta sección manda sobre todo lo que sigue.
 > Los valores exactos viven en `frontend/src/index.css` (`:root` y `.dark`); no escribir colores hex en componentes.
 >
-> - **Paleta:** fondo `#eef2f8`, tarjetas `#ffffff`, texto `#1f2937`, texto secundario `#5b6577`, bordes `#e2e7f0`.
->   Acción principal en azul pastel `#b9d1f5` con texto `#183357`. Estados: menta (éxito), durazno (advertencia), rosa (error),
->   siempre con icono y texto. Gráficos: real `#5b8def` vs. estimado `#c97a2e`; cada gráfico usa
->   su propio color `--chart-1..5`.
+> - **Paleta (vigente desde 2026-11-18):** verde bosque `#2B4D3B` (texto y títulos), salvia `#6E9B7B` (acento
+>   decorativo; no se usa para texto porque sobre crema da 2,96:1), salvia clara `#B9D2C2` (superficies de
+>   acento y etiquetas), arena `#E7D7C7` (superficies secundarias) y crema `#FBF7F1` (fondo de página); tarjetas blancas.
+>   Texto secundario `#55675C`, bordes `#E9DFD3`, foco `#5A8768`. Estados: menta (éxito), durazno (advertencia), rosa
+>   (error), siempre con icono y texto. Gráficos: serie principal en verde `#428C5C`; real `#6A8ED4` vs. estimado
+>   `#B87A43`; el resto usa `--chart-2..5` (validados: contraste ≥ 3:1 y separación para daltonismo).
+> - **Contraste para lo importante (2026-11-19):** la acción principal usa verde bosque `#2B4D3B` con texto crema
+>   (`--emphasis`, 8,8:1; en oscuro salvia clara con texto verde). La salvia clara queda para superficies. Lo que pide
+>   actuar a la persona («Le toca a usted», «Su turno», avisos sin leer) usa arcilla `#A3561C` (`--attention`, 5,4:1;
+>   texto `#8A4512` sobre `#F8E6D2`). Pasos completados de los procesos y marca del menú activo en verde bosque.
+>   Moderación: una acción principal por zona; las demás, `outline`/`secondary`/`ghost`. La arcilla no sustituye a los
+>   estados de error o advertencia.
+> - **Lectura cómoda:** texto pequeño mínimo 13 px (`text-xs`), ejes de gráficos 12 px, descripciones de hasta ~70
+>   caracteres por línea, sin texto atenuado con opacidad y sin mayúsculas sostenidas. Botones secundarios con borde
+>   gris verdoso (`--input`), no oscuro.
 > - **Diferenciar secciones:** tonos `tone-blue|mint|peach|lavender|rose` (StatCard `color`), encabezados de tarjeta
 >   con fondo suave y tablas con filas alternas.
 > - **Tipografía:** sans del sistema para toda la interfaz; mono solo para códigos/claves. Títulos `font-semibold`, sin

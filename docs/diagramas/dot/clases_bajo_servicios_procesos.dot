@@ -1,0 +1,13 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.3, nodesep=0.35, ranksep=0.7, splines=true, fontname="DejaVu Sans"];
+  node [shape=plain, fontname="DejaVu Sans", fontsize=12, color="#2B4D3B"];
+  edge [color="#55675C", fontname="DejaVu Sans", fontsize=11, fontcolor="#2B4D3B", arrowsize=0.8];
+  graph [nodesep=0.25, ranksep=0.4];
+  "IncidentService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>IncidentService</b></td></tr><tr><td align="left" balign="left">+ search(scope, status, offset, …)<br/>+ get(report_id)<br/>+ summary()<br/>+ alerts()<br/>+ review_alert(report_id)<br/>+ report(title, description, priority, …)<br/>+ accept(report_id)<br/>+ start(report_id)<br/>+ finish(report_id, device_id, sensor_id, …)</td></tr></table>>];
+  "RelocationService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>RelocationService</b></td></tr><tr><td align="left" balign="left">+ search(scope, status, offset, …)<br/>+ get(relocation_id)<br/>+ summary()<br/>+ request(fog_collector_id, reason, description, …)<br/>+ accept(relocation_id)<br/>+ start(relocation_id)<br/>+ finish(relocation_id, destination_location_id, new_orientation, …)<br/>+ reject(relocation_id, reason)</td></tr></table>>];
+  "NotificationService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>NotificationService</b></td></tr><tr><td align="left" balign="left">+ notify(user_ids, title, message, …)<br/>+ list(user_id, limit, unread_only)<br/>+ mark_read(user_id, notification_id)<br/>+ mark_incident_read(user_id, incident_report_id)<br/>+ mark_all_read(user_id)</td></tr></table>>];
+  "AutoIncidentService" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td bgcolor="#E7D7C7"><font point-size="9">«servicio»</font><br/><b>AutoIncidentService</b></td></tr><tr><td align="left" balign="left">+ run()</td></tr></table>>];
+  { rank=same; "IncidentService"; "RelocationService"; "NotificationService"; }
+  { rank=same; "AutoIncidentService"; }
+  "IncidentService" -> "AutoIncidentService" [style=invis];
+}

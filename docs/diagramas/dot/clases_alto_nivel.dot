@@ -1,0 +1,71 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.3, nodesep=0.35, ranksep=0.7, splines=true, fontname="DejaVu Sans"];
+  node [shape=plain, fontname="DejaVu Sans", fontsize=12, color="#2B4D3B"];
+  edge [color="#55675C", fontname="DejaVu Sans", fontsize=11, fontcolor="#2B4D3B", arrowsize=0.8];
+  graph [nodesep=0.4, ranksep=0.9, newrank=true];
+  node [fontsize=22];
+  subgraph "cluster_seguridad" { label=<<b>Seguridad y usuarios</b>>; labeljust=l; style="rounded,filled"; fillcolor="#FBF7F1"; color="#E7D7C7"; fontsize=22; fontcolor="#2B4D3B";
+    "users" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>User</b></td></tr></table>>];
+    "roles" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Role</b></td></tr></table>>];
+    "permissions" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Permission</b></td></tr></table>>];
+    "user_profiles" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>UserProfile</b></td></tr></table>>];
+    "user_sessions" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>UserSession</b></td></tr></table>>];
+    "audit_logs" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>AuditLog</b></td></tr></table>>];
+    "account_recovery_requests" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>AccountRecoveryRequest</b></td></tr></table>>];
+  }
+  subgraph "cluster_iot" { label=<<b>Infraestructura e IoT</b>>; labeljust=l; style="rounded,filled"; fillcolor="#FBF7F1"; color="#E7D7C7"; fontsize=22; fontcolor="#2B4D3B";
+    "locations" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Location</b></td></tr></table>>];
+    "fog_collectors" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>FogCollector</b></td></tr></table>>];
+    "tanks" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Tank</b></td></tr></table>>];
+    "devices" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Device</b></td></tr></table>>];
+    "sensors" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Sensor</b></td></tr></table>>];
+    "sensor_types" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>SensorType</b></td></tr></table>>];
+    "sensor_readings" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>SensorReading</b></td></tr></table>>];
+    "measurement_batches" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>MeasurementBatch</b></td></tr></table>>];
+    "firmware_releases" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>FirmwareRelease</b></td></tr></table>>];
+  }
+  subgraph "cluster_inventario" { label=<<b>Inventario y mantenimiento</b>>; labeljust=l; style="rounded,filled"; fillcolor="#FBF7F1"; color="#E7D7C7"; fontsize=22; fontcolor="#2B4D3B";
+    "inventory_items" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>InventoryItem</b></td></tr></table>>];
+    "inventory_categories" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>InventoryCategory</b></td></tr></table>>];
+    "inventory_movements" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>InventoryMovement</b></td></tr></table>>];
+    "inventory_periods" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>InventoryPeriod</b></td></tr></table>>];
+    "maintenance_records" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>MaintenanceRecord</b></td></tr></table>>];
+  }
+  subgraph "cluster_procesos" { label=<<b>Procesos</b>>; labeljust=l; style="rounded,filled"; fillcolor="#FBF7F1"; color="#E7D7C7"; fontsize=22; fontcolor="#2B4D3B";
+    "incident_reports" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>IncidentReport</b></td></tr></table>>];
+    "fog_collector_relocations" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>FogCollectorRelocation</b></td></tr></table>>];
+    "notifications" [label=<<table border="1" cellborder="0" cellpadding="5" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Notification</b></td></tr></table>>];
+  }
+  "user_profiles" -> "users" [arrowhead=none, taillabel="0..1", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "user_sessions" -> "users" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "audit_logs" -> "users" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "account_recovery_requests" -> "users" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "fog_collectors" -> "locations" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "tanks" -> "locations" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "tanks" -> "fog_collectors" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "devices" -> "fog_collectors" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "devices" -> "firmware_releases" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "sensors" -> "devices" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "sensors" -> "sensor_types" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "sensors" -> "fog_collectors" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "sensors" -> "tanks" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "sensor_readings" -> "measurement_batches" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "sensor_readings" -> "devices" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "sensor_readings" -> "sensors" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "sensor_readings" -> "sensor_types" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "measurement_batches" -> "devices" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "inventory_items" -> "inventory_categories" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "inventory_movements" -> "inventory_items" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "inventory_movements" -> "maintenance_records" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "maintenance_records" -> "incident_reports" [arrowhead=none, taillabel="0..1", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "maintenance_records" -> "devices" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "maintenance_records" -> "sensors" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "incident_reports" -> "devices" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "incident_reports" -> "sensors" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "fog_collector_relocations" -> "fog_collectors" [arrowhead=none, taillabel="*", headlabel="1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "fog_collector_relocations" -> "locations" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "notifications" -> "incident_reports" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "notifications" -> "fog_collector_relocations" [arrowhead=none, taillabel="*", headlabel="0..1", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "roles" -> "permissions" [arrowhead=none, taillabel="*", headlabel="*", labelfontsize=17, labeldistance=1.8, labelangle=25];
+  "users" -> "roles" [arrowhead=none, taillabel="*", headlabel="*", labelfontsize=17, labeldistance=1.8, labelangle=25];
+}

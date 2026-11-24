@@ -1,0 +1,15 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.3, nodesep=0.35, ranksep=0.7, splines=true, fontname="DejaVu Sans"];
+  node [shape=plain, fontname="DejaVu Sans", fontsize=12, color="#2B4D3B"];
+  edge [color="#55675C", fontname="DejaVu Sans", fontsize=11, fontcolor="#2B4D3B", arrowsize=0.8];
+  graph [nodesep=0.2, ranksep=0.55];
+  "locations" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Location</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ name: str<br/>+ description: str [0..1]<br/>+ latitude: decimal [0..1]<br/>+ longitude: decimal [0..1]<br/>+ altitude_m: decimal [0..1]<br/>+ is_active: bool<br/>+ created_at: datetime<br/>+ updated_at: datetime</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "fog_collectors" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>FogCollector</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ code: str<br/>+ name: str<br/>+ location_id: int [0..1] {FK}<br/>+ mesh_area_m2: decimal [0..1]<br/>+ mesh_type: str [0..1]<br/>+ orientation: str [0..1]<br/>+ installed_on: date [0..1]<br/>+ is_active: bool<br/>+ created_at: datetime<br/>+ updated_at: datetime</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "tanks" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Tank</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ code: str<br/>+ name: str<br/>+ location_id: int [0..1] {FK}<br/>+ fog_collector_id: int [0..1] {FK}<br/>+ capacity_liters: decimal [0..1]<br/>+ height_cm: decimal [0..1]<br/>+ is_active: bool<br/>+ created_at: datetime<br/>+ updated_at: datetime</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "greenhouses" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>Greenhouse</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ code: str<br/>+ name: str<br/>+ location_id: int [0..1] {FK}<br/>+ area_m2: decimal [0..1]<br/>+ tank_id: int [0..1] {FK}<br/>+ is_active: bool<br/>+ created_at: datetime<br/>+ updated_at: datetime</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "fog_collectors" -> "locations" [arrowhead=none, taillabel="*", headlabel="0..1", label="", labelfontsize=11];
+  "tanks" -> "locations" [arrowhead=none, taillabel="*", headlabel="0..1", label="", labelfontsize=11];
+  "tanks" -> "fog_collectors" [arrowhead=none, taillabel="*", headlabel="0..1", label="", labelfontsize=11];
+  "greenhouses" -> "locations" [arrowhead=none, taillabel="*", headlabel="0..1", label="", labelfontsize=11];
+  "greenhouses" -> "tanks" [arrowhead=none, taillabel="*", headlabel="0..1", label="", labelfontsize=11];
+}

@@ -1,0 +1,23 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.3, nodesep=0.35, ranksep=0.7, splines=true, fontname="DejaVu Sans"];
+  node [shape=plain, fontname="DejaVu Sans", fontsize=12, color="#2B4D3B"];
+  edge [color="#55675C", fontname="DejaVu Sans", fontsize=11, fontcolor="#2B4D3B", arrowsize=0.8];
+  graph [nodesep=0.2, ranksep=0.55];
+  "inventory_categories" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>InventoryCategory</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ name: str<br/>+ description: str [0..1]<br/>+ is_active: bool<br/>+ created_at: datetime<br/>+ updated_at: datetime</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "inventory_items" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>InventoryItem</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ code: str<br/>+ name: str<br/>+ description: str [0..1]<br/>+ category_id: int {FK}<br/>+ unit: str<br/>+ current_stock: decimal<br/>+ min_stock: decimal<br/>+ condition: str<br/>+ storage_location: str [0..1]<br/>+ is_active: bool<br/>+ created_at: datetime<br/>+ updated_at: datetime</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "inventory_item_compatibility" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>InventoryItemCompatibility</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ item_id: int {FK}<br/>+ device_id: int [0..1] {FK}<br/>+ sensor_id: int [0..1] {FK}</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "inventory_movement_types" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>InventoryMovementType</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ code: str<br/>+ name: str<br/>+ direction: int<br/>+ manual_allowed: bool</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "inventory_movements" [label=<<table border="1" cellborder="1" cellspacing="0" cellpadding="4" color="#2B4D3B" bgcolor="white"><tr><td bgcolor="#B9D2C2"><b>InventoryMovement</b></td></tr><tr><td align="left" balign="left">+ id: int {PK}<br/>+ item_id: int {FK}<br/>+ movement_type_id: int {FK}<br/>+ quantity: decimal<br/>+ stock_before: decimal<br/>+ stock_after: decimal<br/>+ reason: str<br/>+ user_id: int {FK}<br/>+ maintenance_record_id: int [0..1] {FK}<br/>+ unit_cost: decimal [0..1]<br/>+ occurred_at: datetime<br/>+ created_at: datetime</td></tr><tr><td align="left" balign="left"> </td></tr></table>>];
+  "inventory_items" -> "inventory_categories" [arrowhead=none, taillabel="*", headlabel="1", label="category", labelfontsize=11];
+  "inventory_item_compatibility" -> "inventory_items" [arrowhead=none, taillabel="*", headlabel="1", label="item", labelfontsize=11];
+  "inventory_item_compatibility" -> "devices" [arrowhead=none, taillabel="*", headlabel="0..1", label="", labelfontsize=11];
+  "inventory_item_compatibility" -> "sensors" [arrowhead=none, taillabel="*", headlabel="0..1", label="", labelfontsize=11];
+  "inventory_movements" -> "inventory_items" [arrowhead=none, taillabel="*", headlabel="1", label="item", labelfontsize=11];
+  "inventory_movements" -> "inventory_movement_types" [arrowhead=none, taillabel="*", headlabel="1", label="movement_type", labelfontsize=11];
+  "inventory_movements" -> "users" [arrowhead=none, taillabel="*", headlabel="1", label="", labelfontsize=11];
+  "inventory_movements" -> "maintenance_records" [arrowhead=none, taillabel="*", headlabel="0..1", label="", labelfontsize=11];
+  "devices" [label=<<table border="1" cellborder="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td><b>Device</b><br/><font point-size="8" color="#55675C">(otro módulo)</font></td></tr></table>>];
+  "maintenance_records" [label=<<table border="1" cellborder="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td><b>MaintenanceRecord</b><br/><font point-size="8" color="#55675C">(otro módulo)</font></td></tr></table>>];
+  "sensors" [label=<<table border="1" cellborder="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td><b>Sensor</b><br/><font point-size="8" color="#55675C">(otro módulo)</font></td></tr></table>>];
+  "users" [label=<<table border="1" cellborder="0" cellpadding="4" color="#2B4D3B" bgcolor="#FBF7F1"><tr><td><b>User</b><br/><font point-size="8" color="#55675C">(otro módulo)</font></td></tr></table>>];
+}

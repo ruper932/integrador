@@ -106,6 +106,7 @@ POST /api/v1/incidents/{id}/accept
 | Inventario | `inventory.py` | `inventory_service`, `inventory_period_service` | `inventory_items`, `inventory_movements`, `inventory_periods`, `inventory_counts`, … |
 | Mantenimiento | `inventory.py` | `maintenance_service` | `maintenance_records`, `maintenance_items` |
 | Reportes de incidencia | `incidents.py` | `incident_service`, `auto_incident_service`, `notification_service` | `incident_reports`, `notifications` |
+| Reubicación de atrapanieblas | `relocations.py` | `relocation_service` | `fog_collector_relocations` |
 | Reportes y exportación | `reports.py` | `report_service`, `report_catalog`, `report_renderers` | consultas de todos los módulos |
 
 ## 4. Datos
@@ -138,6 +139,7 @@ Inventario       inventory_categories · inventory_items · inventory_item_compa
                  inventory_counts · inventory_period_balances
 Mantenimiento    maintenance_records · maintenance_items
 Incidencias      incident_reports · notifications
+Reubicaciones    fog_collector_relocations
 ML (pendiente)   ml_models · predictions
 ```
 
@@ -205,6 +207,7 @@ sensores ──▶ lectura con message_id (UUID) ──▶ /pending.jsonl en Lit
 |---------|-----------|
 | Reporte de incidencia | docente reporta → mantenimiento acepta, inicia y finaliza (con salida de repuestos) → director y administrador supervisan. El docente recibe un aviso en cada etapa. |
 | Incidencia automática | el sistema detecta una estación activa sin comunicación o un sensor con lecturas anómalas → abre un reporte que sigue el flujo anterior, sin duplicados. La revisión corre dentro de la API cada 15 min, sin colas ni cron. |
+| Reubicación de atrapanieblas | docente solicita (motivo y lugar sugerido) → mantenimiento acepta, inicia el traslado y finaliza con la nueva ubicación (el atrapanieblas y sus estaciones se trasladan con historial) o la rechaza antes de iniciar → director y administrador supervisan. Una sola solicitud en curso por atrapanieblas. |
 | Mantenimiento con repuestos | mantenimiento registra el trabajo → se genera la salida de inventario en la misma transacción; si falta stock, no se registra nada. |
 | Recuperación de cuenta | usuario solicita → administrador verifica y aprueba o rechaza → usuario cambia la contraseña temporal. |
 | Periodo de inventario | administrador abre el periodo → registra el conteo físico → cierra con ajustes y saldos valorizados. |
