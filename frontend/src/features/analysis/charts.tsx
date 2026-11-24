@@ -29,7 +29,7 @@ const POSITIVE = 'var(--chart-pos)'
 const NEGATIVE = 'var(--chart-neg)'
 const GRID = 'var(--grid)'
 const AXIS = 'var(--muted-foreground)'
-const tick = { fill: AXIS, fontSize: 11 }
+const tick = { fill: AXIS, fontSize: 12 }
 const tooltipStyle = {
   labelStyle: { color: 'var(--foreground)', fontWeight: 584 },
   itemStyle: { color: 'var(--foreground)' },
@@ -156,7 +156,7 @@ export function DailyCaptureChart({
               y={mean}
               stroke={AXIS}
               strokeDasharray="2 4"
-              label={{ value: `media ${formatNumber(mean, 1)} L`, position: 'insideTopRight', fill: AXIS, fontSize: 11 }}
+              label={{ value: `media ${formatNumber(mean, 1)} L`, position: 'insideTopRight', fill: AXIS, fontSize: 12 }}
             />
           )}
         </ComposedChart>
@@ -219,7 +219,7 @@ export function CorrelationBars({
             dataKey="r"
             radius={4}
             isAnimationActive={false}
-            label={{ position: 'right', fill: 'var(--foreground)', fontSize: 11, formatter: (v: unknown) => formatNumber(Number(v), 2) }}
+            label={{ position: 'right', fill: 'var(--foreground)', fontSize: 12, formatter: (v: unknown) => formatNumber(Number(v), 2) }}
           >
             {data.map((row) => (
               <Cell
@@ -263,7 +263,7 @@ export function ScatterPlot({
             tick={tick}
             tickLine={false}
             axisLine={false}
-            label={{ value: `${xName} (${xUnit})`, position: 'insideBottom', offset: -10, fill: AXIS, fontSize: 11 }}
+            label={{ value: `${xName} (${xUnit})`, position: 'insideBottom', offset: -10, fill: AXIS, fontSize: 12 }}
           />
           <YAxis
             type="number"
@@ -336,7 +336,7 @@ export function CategoryBars({
             label={{
               position: 'right',
               fill: 'var(--foreground)',
-              fontSize: 11,
+              fontSize: 12,
               formatter: (v: unknown) => `${formatNumber(Number(v), unit ? 1 : 0)}${unit}`,
             }}
           />

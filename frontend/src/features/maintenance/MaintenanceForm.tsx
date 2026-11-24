@@ -8,7 +8,7 @@ import { ErrorAlert, Field, Loading, NativeSelect } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { useDevices, useSensors } from '@/features/devices/api'
+import { refreshStations, useDevices, useSensors } from '@/features/devices/api'
 import { FINAL_LABELS, FINAL_STATUSES, MAINTENANCE_TYPES, TYPE_LABELS } from '@/features/maintenance/labels'
 import { api } from '@/lib/api'
 import { formatNumber, localInputToIso, nowForInput } from '@/lib/format'
@@ -18,10 +18,13 @@ const schema = z
   .object({
     device_id: z.string().min(1, 'Seleccione el dispositivo'),
     sensor_id: z.string(),
-    performed_at: z.string().min(1, 'Indique la fecha'),
+    performed_at: z
+      .string()
+      .min(1, 'Indique la fecha')
+      .refine((v) => new Date(v).getTime() <= Date.now() + 60_000, 'No puede estar en el futuro'),
     maintenance_type: z.enum(MAINTENANCE_TYPES),
     final_status: z.enum(FINAL_STATUSES),
-    description: z.string().trim().min(5, 'Describa el trabajo realizado'),
+    description: z.string().trim().min(5, 'Describa el trabajo realizado').max(4000, 'Máximo 4000 caracteres'),
     parts: z.array(
       z.object({
         item_id: z.string().min(1, 'Seleccione el repuesto'),
@@ -54,6 +57,15 @@ export function MaintenanceForm(props: { onDone: () => void; incident?: Incident
   return <WorkForm {...props} devices={devices.data} sensors={sensors.data} items={items.data} />
 }
 
+/** Qué le pasa al componente atendido según el estado final (lo aplica el backend al guardar). */
+export function finalStatusEffect(status: FormValues['final_status'], target: 'sensor' | 'dispositivo'): string {
+  if (status === 'fuera_de_servicio')
+    return `El ${target} pasará a «mantenimiento» y no aceptará lecturas hasta otro mantenimiento que lo deje operativo.`
+  if (status === 'reemplazado')
+    return `El ${target} quedará inactivo; vuelva a activarlo en «Dispositivos y sensores» al instalar la unidad nueva.`
+  return `Si el ${target} estaba en mantenimiento, vuelve a quedar activo.`
+}
+
 function WorkForm({
   onDone,
   incident,
@@ -69,7 +81,27 @@ function WorkForm({
 }) {
   const qc = useQueryClient()
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    // Los repuestos dependen del inventario: sin repetir y sin superar el stock disponible.
+    resolver: zodResolver(
+      schema.superRefine((v, ctx) => {
+        const seen = new Set<string>()
+        v.parts.forEach((p, index) => {
+          if (!p.item_id) return
+          if (seen.has(p.item_id)) {
+            ctx.addIssue({ code: 'custom', path: ['parts', index, 'item_id'], message: 'Este repuesto ya está en la lista' })
+          }
+          seen.add(p.item_id)
+          const item = items.find((i) => String(i.id) === p.item_id)
+          if (item && Number(p.quantity) > Number(item.current_stock)) {
+            ctx.addIssue({
+              code: 'custom',
+              path: ['parts', index, 'quantity'],
+              message: `Disponible: ${formatNumber(item.current_stock, 3)} ${item.unit}`,
+            })
+          }
+        })
+      }),
+    ),
     defaultValues: {
       device_id: incident?.device_id ? String(incident.device_id) : '',
       sensor_id: incident?.sensor_id ? String(incident.sensor_id) : '',
@@ -99,6 +131,7 @@ function WorkForm({
       qc.invalidateQueries({ queryKey: ['maintenance'] })
       qc.invalidateQueries({ queryKey: ['inventory'] })
       qc.invalidateQueries({ queryKey: ['incidents'] })
+      refreshStations(qc) // el estado final cambia el del sensor o la estación
       onDone()
     },
   })
@@ -136,7 +169,7 @@ function WorkForm({
         </Field>
         {!incident && (
           <Field label="Fecha y hora" htmlFor={`${prefix}-date`} error={errors.performed_at?.message}>
-            <Input id={`${prefix}-date`} type="datetime-local" {...form.register('performed_at')} />
+            <Input id={`${prefix}-date`} type="datetime-local" max={nowForInput()} {...form.register('performed_at')} />
           </Field>
         )}
         <Field label="Tipo" htmlFor={`${prefix}-type`}>
@@ -148,7 +181,11 @@ function WorkForm({
             ))}
           </NativeSelect>
         </Field>
-        <Field label="Estado final del componente" htmlFor={`${prefix}-final`}>
+        <Field
+          label="Estado final del componente"
+          htmlFor={`${prefix}-final`}
+          hint={finalStatusEffect(form.watch('final_status'), form.watch('sensor_id') ? 'sensor' : 'dispositivo')}
+        >
           <NativeSelect id={`${prefix}-final`} {...form.register('final_status')}>
             {FINAL_STATUSES.map((t) => (
               <option key={t} value={t}>
@@ -178,7 +215,7 @@ function WorkForm({
                 <NativeSelect id={`${prefix}-p-${index}`} {...form.register(`parts.${index}.item_id`)}>
                   <option value="">Seleccione…</option>
                   {items.map((i) => (
-                    <option key={i.id} value={i.id}>
+                    <option key={i.id} value={i.id} disabled={Number(i.current_stock) <= 0}>
                       {i.code} — {i.name} (disp. {formatNumber(i.current_stock, 3)} {i.unit})
                     </option>
                   ))}

@@ -6,20 +6,22 @@ import { useForm } from 'react-hook-form'
 import { useSearchParams } from 'react-router'
 import { z } from 'zod'
 
-import { EmptyState, ErrorAlert, Field, Loading, NativeSelect, Notice, PageHeader, Pagination, StatCard, type ToneColor } from '@/components/common'
+import { EmptyState, ErrorAlert, Field, Loading, NativeSelect, NextStepCard, Notice, PageHeader, Pagination, StatCard, YourTurnBadge, type ToneColor } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useHasPermission, useMe } from '@/features/auth/useAuth'
-import { useDevices, useSensors } from '@/features/devices/api'
+import { refreshStations, useDevices, useSensors } from '@/features/devices/api'
 import { useIncidentSummary } from '@/features/incidents/api'
+import { MediumAlertReminders } from '@/features/incidents/IncidentAlerts'
 import { AutoBadge, IncidentStatusBadge, IncidentTimeline, PriorityBadge, reporterName } from '@/features/incidents/IncidentBits'
 import { PRIORITY_LABELS, STATUS_LABELS, STATUS_ORDER } from '@/features/incidents/labels'
 import { FINAL_LABELS, TYPE_LABELS } from '@/features/maintenance/labels'
 import { MaintenanceForm } from '@/features/maintenance/MaintenanceForm'
 import { api } from '@/lib/api'
+import { ACTION_LABELS, incidentNextStep, type Viewer } from '@/lib/flow'
 import { FilterToolbar } from '@/features/reports/FilterToolbar'
 import { listParams } from '@/features/reports/params'
 import type { FilterValues } from '@/features/reports/ReportFilterField'
@@ -173,18 +175,24 @@ function IncidentDetail({ id, onClose }: { id: number; onClose: () => void }) {
     queryFn: async () => (await api.get<Incident>(`/incidents/${id}`)).data,
   })
   const action = useMutation({
-    mutationFn: async (step: 'accept' | 'start') => (await api.post<Incident>(`/incidents/${id}/${step}`)).data,
+    mutationFn: async (step: 'accept' | 'start' | 'accept_start') => {
+      // «Aceptar e iniciar»: para quien ya está en el lugar, los dos pasos seguidos.
+      if (step === 'accept_start') await api.post(`/incidents/${id}/accept`)
+      return (await api.post<Incident>(`/incidents/${id}/${step === 'accept_start' ? 'start' : step}`)).data
+    },
     onSuccess: (updated) => {
       qc.setQueryData(['incidents', 'detail', id], updated)
       qc.invalidateQueries({ queryKey: ['incidents'] })
       qc.invalidateQueries({ queryKey: ['maintenance'] })
+      refreshStations(qc) // finalizar aplica el estado final al sensor o la estación
     },
+    // Si «aceptar e iniciar» falla en el segundo paso, el reporte ya quedó aceptado: se recarga.
+    onError: () => qc.invalidateQueries({ queryKey: ['incidents'] }),
   })
 
   const data = incident.data
   const m = data?.maintenance
-  const isAssignee = Boolean(data?.assignee && data.assignee.id === me.data?.id)
-  const attend = can('incidencias.atender')
+  const step = data && incidentNextStep(data, { id: me.data?.id, canAttend: can('incidencias.atender') })
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -208,6 +216,59 @@ function IncidentDetail({ id, onClose }: { id: number; onClose: () => void }) {
               </DialogDescription>
             </DialogHeader>
 
+            {step && (
+              <NextStepCard
+                yourTurn={step.yourTurn}
+                title={step.title}
+                actions={
+                  step.yourTurn &&
+                  !finishing && (
+                    <>
+                      {step.action === 'aceptar' && (
+                        <>
+                          <Button onClick={() => action.mutate('accept')} disabled={action.isPending}>
+                            <UserCheck /> Aceptar reporte
+                          </Button>
+                          <Button variant="outline" onClick={() => action.mutate('accept_start')} disabled={action.isPending}>
+                            <Play /> Aceptar e iniciar ahora
+                          </Button>
+                        </>
+                      )}
+                      {step.action === 'iniciar' && (
+                        <Button onClick={() => action.mutate('start')} disabled={action.isPending}>
+                          <Play /> Iniciar mantenimiento
+                        </Button>
+                      )}
+                      {step.action === 'finalizar' && (
+                        <Button onClick={() => setFinishing(true)}>
+                          <ClipboardCheck /> Registrar trabajo y finalizar
+                        </Button>
+                      )}
+                    </>
+                  )
+                }
+              >
+                {step.text}
+                <ErrorAlert error={action.error} />
+              </NextStepCard>
+            )}
+            {finishing && step?.action === 'finalizar' && step.yourTurn && (
+              <div className="rounded-xl border p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="font-medium">Finalizar mantenimiento</span>
+                  <Button variant="ghost" size="sm" onClick={() => setFinishing(false)}>
+                    Cancelar
+                  </Button>
+                </div>
+                <MaintenanceForm incident={data} onDone={() => setFinishing(false)} />
+              </div>
+            )}
+
+            {data.priority === 'media' && data.status === 'abierto' && (
+              <Notice tone="warning" title="Recordatorio">
+                Esta alerta de prioridad media sigue sin atender desde el {formatDateTime(data.created_at)}.
+              </Notice>
+            )}
             <p className="text-sm whitespace-pre-line">{data.description}</p>
             <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
               <div>
@@ -256,42 +317,6 @@ function IncidentDetail({ id, onClose }: { id: number; onClose: () => void }) {
               </div>
             )}
 
-            <ErrorAlert error={action.error} />
-            {attend && data.status === 'abierto' && (
-              <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={() => action.mutate('accept')} disabled={action.isPending}>
-                  <UserCheck /> Aceptar reporte
-                </Button>
-                <span className="text-muted-foreground text-xs">
-                  {data.source === 'sistema'
-                    ? 'Quedará asignado a usted.'
-                    : 'Quedará asignado a usted y se avisará a quien lo reportó.'}
-                </span>
-              </div>
-            )}
-            {isAssignee && data.status === 'aceptado' && (
-              <div>
-                <Button onClick={() => action.mutate('start')} disabled={action.isPending}>
-                  <Play /> Iniciar mantenimiento
-                </Button>
-              </div>
-            )}
-            {isAssignee && data.status === 'en_progreso' &&
-              (finishing ? (
-                <div className="rounded-xl border p-4">
-                  <div className="mb-3 font-medium">Finalizar mantenimiento</div>
-                  <MaintenanceForm incident={data} onDone={() => setFinishing(false)} />
-                </div>
-              ) : (
-                <div>
-                  <Button onClick={() => setFinishing(true)}>
-                    <ClipboardCheck /> Registrar trabajo y finalizar
-                  </Button>
-                </div>
-              ))}
-            {!isAssignee && data.assignee && data.status !== 'finalizado' && attend && (
-              <Notice tone="info">Este reporte está asignado a {data.assignee.full_name}.</Notice>
-            )}
           </>
         )}
       </DialogContent>
@@ -301,7 +326,8 @@ function IncidentDetail({ id, onClose }: { id: number; onClose: () => void }) {
 
 // --- Lista -------------------------------------------------------------------
 
-function IncidentRow({ incident, onOpen }: { incident: Incident; onOpen: () => void }) {
+function IncidentRow({ incident, viewer, onOpen }: { incident: Incident; viewer: Viewer; onOpen: () => void }) {
+  const step = incidentNextStep(incident, viewer)
   return (
     <li>
       <button
@@ -321,9 +347,13 @@ function IncidentRow({ incident, onOpen }: { incident: Incident; onOpen: () => v
           </span>
         </span>
         <span className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <span className="text-muted-foreground text-xs">
-            {incident.assignee ? `Asignado a ${incident.assignee.full_name}` : 'Sin asignar'}
-          </span>
+          {step?.yourTurn ? (
+            <YourTurnBadge action={ACTION_LABELS[step.action]} />
+          ) : (
+            <span className="text-muted-foreground text-xs">
+              {incident.assignee ? `Asignado a ${incident.assignee.full_name}` : 'Sin asignar'}
+            </span>
+          )}
           <IncidentStatusBadge status={incident.status} />
         </span>
       </button>
@@ -360,6 +390,8 @@ function SummaryCards({ summary, scopes }: { summary: IncidentSummary; scopes: I
 
 export function IncidentsPage() {
   const can = useHasPermission()
+  const me = useMe()
+  const viewer: Viewer = { id: me.data?.id, canAttend: can('incidencias.atender') }
   const [params, setParams] = useSearchParams()
   const tabs = TABS.filter((t) => can(t.permission))
   const [scope, setScope] = useState<IncidentScope>(tabs[0]?.scope ?? 'mine')
@@ -426,6 +458,7 @@ export function IncidentsPage() {
         </Card>
       )}
 
+      <MediumAlertReminders onOpen={open} />
       {summary.data && <SummaryCards summary={summary.data} scopes={tabs.map((t) => t.scope)} />}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -447,7 +480,7 @@ export function IncidentsPage() {
             >
               {t.label}
               {t.scope === 'open' && Boolean(summary.data?.open) && (
-                <span className="bg-warning-soft text-warning ml-1.5 rounded-md px-1.5 text-[11px] font-medium">
+                <span className="bg-warning-soft text-warning ml-1.5 rounded-md px-1.5 text-xs font-semibold">
                   {summary.data?.open}
                 </span>
               )}
@@ -482,7 +515,7 @@ export function IncidentsPage() {
             ) : (
               <ul className="divide-y">
                 {list.data?.items.map((incident) => (
-                  <IncidentRow key={incident.id} incident={incident} onOpen={() => open(incident.id)} />
+                  <IncidentRow key={incident.id} incident={incident} viewer={viewer} onOpen={() => open(incident.id)} />
                 ))}
               </ul>
             )}

@@ -163,7 +163,18 @@ export interface FogCollector {
   location_id: number | null
   mesh_area_m2: string | null
   mesh_type: string | null
+  orientation: string | null
   installed_on: string | null
+  is_active: boolean
+}
+
+export interface Location {
+  id: number
+  name: string
+  description: string | null
+  latitude: string | null
+  longitude: string | null
+  altitude_m: string | null
   is_active: boolean
 }
 
@@ -186,10 +197,53 @@ export interface Device {
   name: string
   description: string | null
   firmware_version: string | null
+  /** Versión asignada para instalar por OTA. */
+  target_firmware_version?: string | null
   status: ComponentStatus
   fog_collector_id: number | null
   last_seen_at: string | null
+  /** Segundos entre lecturas de la estación: 5 (tiempo real), 30 o 60. */
+  sample_interval_s: number
   created_at: string
+}
+
+export interface ProvisionalStation {
+  device_id: number
+  device_code: string
+  device_name: string
+  fog_collector: string | null
+  mesh_area_m2: number | null
+  last_seen_at: string | null
+  estado: 'generada' | 'datos_insuficientes'
+  resultado_litros: number | null
+  referencia_media_7d_litros: number | null
+  captado_hoy_litros: number | null
+  variables: Record<string, number | null>
+  faltantes: string[]
+}
+
+export interface ProvisionalPrediction {
+  provisional: boolean
+  modelo_disponible: boolean
+  motivo: string | null
+  version_modelo: string | null
+  horizonte: string | null
+  metricas_simulacion: Record<string, { mae_litros: number; rmse_litros: number; r2: number }> | null
+  generado_en: string
+  dia_base: string
+  fecha_predicha: string
+  estaciones: ProvisionalStation[]
+}
+
+export interface FirmwareRelease {
+  id: number
+  version: string
+  size_bytes: number
+  sha256: string
+  notes: string | null
+  uploaded_by: string
+  created_at: string
+  assigned_devices: number
 }
 
 export interface DeviceWithKey {
@@ -432,13 +486,57 @@ export interface IncidentSummary {
   all: Partial<Record<IncidentStatus, number>> | null
 }
 
+/** Alertas abiertas avisadas al usuario: las altas sin revisar bloquean la interfaz; las medias se recuerdan. */
+export interface IncidentAlerts {
+  blocking: Incident[]
+  reminders: Incident[]
+}
+
 export interface AppNotification {
   id: number
   title: string
   message: string
   incident_report_id: number | null
+  relocation_id: number | null
   created_at: string
   read_at: string | null
+}
+
+export type RelocationStatus = 'pendiente' | 'aceptado' | 'en_progreso' | 'finalizado' | 'rechazado'
+export type RelocationReason = 'espacio_insuficiente' | 'interferencia_con_actividades' | 'obstruccion_de_la_niebla' | 'otro'
+
+export interface Place {
+  id: number
+  name: string
+}
+
+export interface Relocation {
+  id: number
+  status: RelocationStatus
+  reason: RelocationReason
+  description: string
+  fog_collector: { id: number; code: string; name: string }
+  origin_location: Place | null
+  proposed_location: Place | null
+  proposed_place: string | null
+  destination_location: Place | null
+  previous_orientation: string | null
+  new_orientation: string | null
+  work_notes: string | null
+  rejection_reason: string | null
+  requester: Person
+  assignee: Person | null
+  created_at: string
+  accepted_at: string | null
+  started_at: string | null
+  finished_at: string | null
+}
+
+export interface RelocationSummary {
+  mine: Partial<Record<RelocationStatus, number>> | null
+  open: number | null
+  assigned_active: number | null
+  all: Partial<Record<RelocationStatus, number>> | null
 }
 
 export interface ReportFilterDef {
@@ -455,9 +553,65 @@ export interface ReportDefinition {
   filters: ReportFilterDef[]
 }
 
+export interface ReportChartSeries {
+  name: string
+  values: (number | null)[]
+}
+
+export interface ReportChart {
+  title: string
+  kind: 'bar' | 'line'
+  unit: string
+  horizontal: boolean
+  categories: string[]
+  series: ReportChartSeries[]
+}
+
+/** Resumen y gráficos de un reporte: los mismos que lleva el archivo Excel o PDF exportado. */
+export interface ReportCharts {
+  title: string
+  rows: number
+  criteria: string[]
+  summary: { label: string; value: string }[]
+  charts: ReportChart[]
+}
+
 export interface ReportFilterOptions {
   responsibles: { id: number; full_name: string }[]
   reporters: { id: number; full_name: string }[]
   actors: { id: number; full_name: string }[] | null
   audit_actions: string[] | null
+}
+
+// --- Monitoreo en vivo ---
+
+export interface LivePoint {
+  t: string
+  v: number
+}
+
+export interface LiveVariable {
+  sensor_type: SensorType
+  aggregation: 'incremental' | 'instantaneo'
+  latest_value: number | null
+  latest_at: string | null
+  minimum: number | null
+  maximum: number | null
+  average: number | null
+  points: LivePoint[]
+}
+
+export interface LiveData {
+  generated_at: string
+  window_minutes: number
+  device: {
+    id: number
+    code: string
+    name: string
+    status: ComponentStatus
+    last_seen_at: string | null
+    sample_interval_s: number
+    is_stale: boolean
+  }
+  variables: LiveVariable[]
 }

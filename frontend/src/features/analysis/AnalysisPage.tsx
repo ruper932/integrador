@@ -20,6 +20,7 @@ import {
 } from '@/features/analysis/charts'
 import { PRIORITY_LABELS, STATUS_LABELS } from '@/features/incidents/labels'
 import { FINAL_LABELS, TYPE_LABELS } from '@/features/maintenance/labels'
+import { ExportControls, useModuleReports } from '@/features/reports/FilterToolbar'
 import { ReportFilterField, type FilterValues } from '@/features/reports/ReportFilterField'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -157,6 +158,7 @@ export function AnalysisPage() {
     placeholderData: keepPreviousData,
   })
   const a = analysis.data
+  const [report] = useModuleReports(['analisis'])
   const [dailyMode, setDailyMode] = useState<DailyMode>('bars')
   const [showAverage, setShowAverage] = useState(true)
   const [picked, setPicked] = useState<string | null>(null)
@@ -176,6 +178,17 @@ export function AnalysisPage() {
           {FILTERS.map((def) => (
             <ReportFilterField key={def.key} def={def} values={values} set={set} />
           ))}
+          {report && (
+            <div className="grid gap-2 border-t pt-3 sm:col-span-2">
+              <div className="flex flex-wrap items-end gap-3">
+                <ExportControls report={report} values={values} />
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Exporta este análisis con los mismos filtros. Excel y PDF incluyen el resumen y los gráficos; CSV, solo los
+                indicadores.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

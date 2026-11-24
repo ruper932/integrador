@@ -1,7 +1,10 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CloudFog, Compass, Cpu, Droplets, Gauge, MapPin, Pencil, TriangleAlert, Wrench } from 'lucide-react'
+import { CloudFog, Compass, Cpu, Droplets, Gauge, MapPin, Pencil, Truck, TriangleAlert, Wrench } from 'lucide-react'
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
+import { z } from 'zod'
 
 import { ErrorAlert, Field, Loading, NativeSelect, PageHeader, StatCard, StatusBadge } from '@/components/common'
 import { Button } from '@/components/ui/button'
@@ -9,11 +12,15 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useHasPermission } from '@/features/auth/useAuth'
+import { ORIENTATIONS, RELOCATION_STATUS_LABELS } from '@/features/relocations/labels'
 import { FilterToolbar } from '@/features/reports/FilterToolbar'
 import type { FilterValues } from '@/features/reports/ReportFilterField'
 import { api } from '@/lib/api'
 import { formatCalendarDate, formatDate, formatNumber, relativeTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { todayIso } from '@/lib/people'
+import { name, numberOrNull, optionalNumber, pastOrToday } from '@/lib/validation'
+import type { RelocationStatus } from '@/types/api'
 
 interface Overview {
   id: number
@@ -33,6 +40,7 @@ interface Overview {
   daily: { date: string; value: number }[]
   open_incidents: { id: number; title: string; status: string }[]
   last_maintenance_at: string | null
+  active_relocation: { id: number; status: RelocationStatus } | null
 }
 
 const STATUS_LABELS: Record<Overview['status'], string> = {
@@ -42,7 +50,6 @@ const STATUS_LABELS: Record<Overview['status'], string> = {
   sin_estacion: 'Sin estación IoT',
   inactivo: 'Inactivo',
 }
-const ORIENTATIONS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO']
 
 const hasCoords = (f: Overview) => f.location?.latitude != null && f.location?.longitude != null
 
@@ -82,7 +89,7 @@ function LocationPlan({ items, selected, onSelect }: { items: Overview[]; select
       ))}
       <g transform={`translate(${W - 34}, 34)`} aria-hidden>
         <path d="M0 -16 L6 4 L0 0 L-6 4 Z" fill="var(--foreground)" />
-        <text y={18} textAnchor="middle" fontSize={11} fill="var(--foreground)" fontWeight={584}>
+        <text y={18} textAnchor="middle" fontSize={12} fill="var(--foreground)" fontWeight={584}>
           N
         </text>
       </g>
@@ -90,7 +97,7 @@ function LocationPlan({ items, selected, onSelect }: { items: Overview[]; select
         <line x1={0} y1={0} x2={barPx} y2={0} stroke="var(--foreground)" strokeWidth={2} />
         <line x1={0} y1={-4} x2={0} y2={4} stroke="var(--foreground)" strokeWidth={2} />
         <line x1={barPx} y1={-4} x2={barPx} y2={4} stroke="var(--foreground)" strokeWidth={2} />
-        <text x={barPx / 2} y={-8} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)">
+        <text x={barPx / 2} y={-8} textAnchor="middle" fontSize={12} fill="var(--muted-foreground)">
           ≈ {barMeters} m
         </text>
       </g>
@@ -118,7 +125,7 @@ function LocationPlan({ items, selected, onSelect }: { items: Overview[]; select
             <text y={28} textAnchor="middle" fontSize={12} fill="var(--foreground)" fontWeight={active ? 584 : 492}>
               {f.name}
             </text>
-            <text y={42} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)">
+            <text y={42} textAnchor="middle" fontSize={12} fill="var(--muted-foreground)">
               {f.code} · {formatNumber(Number(f.location!.altitude_m ?? 0), 0)} m
             </text>
           </g>
@@ -155,7 +162,17 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
   )
 }
 
-function FogCollectorCard({ f, selected, onEdit }: { f: Overview; selected: boolean; onEdit?: () => void }) {
+function FogCollectorCard({
+  f,
+  selected,
+  onEdit,
+  canRequestRelocation,
+}: {
+  f: Overview
+  selected: boolean
+  onEdit?: () => void
+  canRequestRelocation: boolean
+}) {
   const loc = f.location
   return (
     <Card id={`atrapanieblas-${f.id}`} className={cn('scroll-mt-24 transition-shadow', selected && 'ring-primary ring-2')}>
@@ -269,6 +286,25 @@ function FogCollectorCard({ f, selected, onEdit }: { f: Overview; selected: bool
             <p className="text-sm">
               Último: {f.last_maintenance_at ? formatDate(f.last_maintenance_at) : 'sin registros'}
             </p>
+            {f.active_relocation ? (
+              <Link
+                to={`/reubicaciones?solicitud=${f.active_relocation.id}`}
+                className="mt-1 flex items-center gap-1.5 text-sm underline decoration-primary decoration-2 underline-offset-2"
+              >
+                <Truck className="size-3.5 shrink-0" aria-hidden /> Reubicación #{f.active_relocation.id}:{' '}
+                {RELOCATION_STATUS_LABELS[f.active_relocation.status].toLowerCase()}
+              </Link>
+            ) : (
+              canRequestRelocation &&
+              f.is_active && (
+                <Link
+                  to={`/reubicaciones?nuevo=${f.id}`}
+                  className="mt-1 flex items-center gap-1.5 text-sm underline decoration-primary decoration-2 underline-offset-2"
+                >
+                  <Truck className="size-3.5 shrink-0" aria-hidden /> Solicitar reubicación
+                </Link>
+              )
+            )}
             {f.open_incidents.map((i) => (
               <Link
                 key={i.id}
@@ -285,34 +321,53 @@ function FogCollectorCard({ f, selected, onEdit }: { f: Overview; selected: bool
   )
 }
 
+const editSchema = z
+  .object({
+    name: name(),
+    mesh_area_m2: optionalNumber(0, 10000, { exclusiveMin: true }),
+    mesh_type: z.string().trim().max(80, 'Máximo 80 caracteres'),
+    orientation: z.string(),
+    installed_on: pastOrToday,
+    latitude: optionalNumber(-90, 90),
+    longitude: optionalNumber(-180, 180),
+    altitude_m: optionalNumber(-500, 9000),
+  })
+  // Las coordenadas solo sirven juntas (el plano de ubicación usa ambas).
+  .refine((v) => (v.latitude === '') === (v.longitude === ''), {
+    message: 'Indique la latitud y la longitud juntas, o ninguna',
+    path: ['longitude'],
+  })
+type EditValues = z.infer<typeof editSchema>
+
 function EditDialog({ f, onClose }: { f: Overview; onClose: () => void }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState({
-    name: f.name,
-    mesh_area_m2: f.mesh_area_m2 ?? '',
-    mesh_type: f.mesh_type ?? '',
-    orientation: f.orientation ?? '',
-    installed_on: f.installed_on ?? '',
-    latitude: f.location?.latitude ?? '',
-    longitude: f.location?.longitude ?? '',
-    altitude_m: f.location?.altitude_m ?? '',
+  const form = useForm<EditValues>({
+    resolver: zodResolver(editSchema),
+    defaultValues: {
+      name: f.name,
+      mesh_area_m2: f.mesh_area_m2 ?? '',
+      mesh_type: f.mesh_type ?? '',
+      orientation: f.orientation ?? '',
+      installed_on: f.installed_on ?? '',
+      latitude: f.location?.latitude ?? '',
+      longitude: f.location?.longitude ?? '',
+      altitude_m: f.location?.altitude_m ?? '',
+    },
   })
-  const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value })
-  const orNull = (v: string) => (v.trim() === '' ? null : v.trim())
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (v: EditValues) => {
       await api.put(`/fog-collectors/${f.id}`, {
-        name: form.name.trim(),
-        mesh_area_m2: orNull(form.mesh_area_m2),
-        mesh_type: orNull(form.mesh_type),
-        orientation: orNull(form.orientation),
-        installed_on: orNull(form.installed_on),
+        name: v.name,
+        mesh_area_m2: numberOrNull(v.mesh_area_m2),
+        mesh_type: v.mesh_type || null,
+        orientation: v.orientation || null,
+        installed_on: v.installed_on || null,
       })
       if (f.location) {
         await api.put(`/locations/${f.location.id}`, {
-          latitude: orNull(form.latitude),
-          longitude: orNull(form.longitude),
-          altitude_m: orNull(form.altitude_m),
+          latitude: numberOrNull(v.latitude),
+          longitude: numberOrNull(v.longitude),
+          altitude_m: numberOrNull(v.altitude_m),
         })
       }
     },
@@ -321,35 +376,35 @@ function EditDialog({ f, onClose }: { f: Overview; onClose: () => void }) {
       onClose()
     },
   })
+  const { errors } = form.formState
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Editar {f.code}</DialogTitle>
           <DialogDescription>
-            Datos técnicos del atrapanieblas{f.location ? ` y coordenadas de «${f.location.name}»` : ''}. El backend valida los rangos.
+            Datos técnicos del atrapanieblas{f.location ? ` y coordenadas de «${f.location.name}»` : ''}. Para cambiarlo de
+            lugar, use una solicitud de reubicación.
           </DialogDescription>
         </DialogHeader>
-        <form
-          className="grid gap-3"
-          onSubmit={(e) => {
-            e.preventDefault()
-            save.mutate()
-          }}
-        >
-          <Field label="Nombre" htmlFor="fc-name">
-            <Input id="fc-name" required minLength={2} value={form.name} onChange={set('name')} />
+        <form className="grid gap-3" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
+          <Field label="Nombre" htmlFor="fc-name" error={errors.name?.message}>
+            <Input id="fc-name" {...form.register('name')} />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Área de malla (m²)" htmlFor="fc-area">
-              <Input id="fc-area" inputMode="decimal" value={form.mesh_area_m2} onChange={set('mesh_area_m2')} />
+            <Field label="Área de malla (m²)" htmlFor="fc-area" error={errors.mesh_area_m2?.message}>
+              <Input id="fc-area" inputMode="decimal" {...form.register('mesh_area_m2')} />
             </Field>
-            <Field label="Tipo de malla" htmlFor="fc-type">
-              <Input id="fc-type" value={form.mesh_type} onChange={set('mesh_type')} placeholder="Raschel 35 %" />
+            <Field label="Tipo de malla" htmlFor="fc-type" error={errors.mesh_type?.message}>
+              <Input id="fc-type" placeholder="Raschel 35 %" {...form.register('mesh_type')} />
             </Field>
             <Field label="Orientación" htmlFor="fc-orient">
-              <NativeSelect id="fc-orient" value={form.orientation} onChange={set('orientation')}>
+              <NativeSelect id="fc-orient" {...form.register('orientation')}>
                 <option value="">—</option>
+                {/* Una orientación antigua escrita a mano se conserva como opción. */}
+                {f.orientation && !(ORIENTATIONS as readonly string[]).includes(f.orientation) && (
+                  <option value={f.orientation}>{f.orientation}</option>
+                )}
                 {ORIENTATIONS.map((o) => (
                   <option key={o} value={o}>
                     {o}
@@ -357,20 +412,20 @@ function EditDialog({ f, onClose }: { f: Overview; onClose: () => void }) {
                 ))}
               </NativeSelect>
             </Field>
-            <Field label="Fecha de instalación" htmlFor="fc-date">
-              <Input id="fc-date" type="date" value={form.installed_on} onChange={set('installed_on')} />
+            <Field label="Fecha de instalación" htmlFor="fc-date" error={errors.installed_on?.message}>
+              <Input id="fc-date" type="date" max={todayIso()} {...form.register('installed_on')} />
             </Field>
           </div>
           {f.location && (
             <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Latitud" htmlFor="fc-lat" hint="Ej.: -15.4021">
-                <Input id="fc-lat" inputMode="decimal" value={form.latitude} onChange={set('latitude')} />
+              <Field label="Latitud" htmlFor="fc-lat" hint="Ej.: -15.4021" error={errors.latitude?.message}>
+                <Input id="fc-lat" inputMode="decimal" {...form.register('latitude')} />
               </Field>
-              <Field label="Longitud" htmlFor="fc-lon" hint="Ej.: -68.9384">
-                <Input id="fc-lon" inputMode="decimal" value={form.longitude} onChange={set('longitude')} />
+              <Field label="Longitud" htmlFor="fc-lon" hint="Ej.: -68.9384" error={errors.longitude?.message}>
+                <Input id="fc-lon" inputMode="decimal" {...form.register('longitude')} />
               </Field>
-              <Field label="Altitud (m)" htmlFor="fc-alt">
-                <Input id="fc-alt" inputMode="decimal" value={form.altitude_m} onChange={set('altitude_m')} />
+              <Field label="Altitud (m)" htmlFor="fc-alt" error={errors.altitude_m?.message}>
+                <Input id="fc-alt" inputMode="decimal" {...form.register('altitude_m')} />
               </Field>
             </div>
           )}
@@ -468,6 +523,7 @@ export function FogCollectorsPage() {
                 f={f}
                 selected={selected === f.id}
                 onEdit={can('infraestructura.gestionar') ? () => setEditing(f) : undefined}
+                canRequestRelocation={can('reubicaciones.solicitar')}
               />
             ))}
           </div>

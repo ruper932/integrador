@@ -66,13 +66,13 @@ export function IncidentTimeline({ incident }: { incident: Incident }) {
             {index < steps.length - 1 && (
               <span
                 aria-hidden
-                className={cn('absolute top-8 bottom-0 left-[15px] w-0.5', done && steps[index + 1]?.at ? 'bg-primary' : 'bg-border')}
+                className={cn('absolute top-8 bottom-0 left-[15px] w-0.5', done && steps[index + 1]?.at ? 'bg-emphasis' : 'bg-border')}
               />
             )}
             <span
               className={cn(
                 'relative grid size-8 shrink-0 place-items-center rounded-full border',
-                done ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground',
+                done ? 'bg-emphasis text-emphasis-foreground border-emphasis' : 'bg-muted text-muted-foreground',
               )}
             >
               <Icon className="size-4" aria-hidden />

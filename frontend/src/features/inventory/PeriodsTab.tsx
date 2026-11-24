@@ -1,7 +1,11 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Download, Lock, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
 
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErrorAlert, Field, Loading, StatusBadge } from '@/components/common'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -11,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useHasPermission } from '@/features/auth/useAuth'
 import { api, downloadFile } from '@/lib/api'
 import { formatDate, formatNumber } from '@/lib/format'
+import { todayIso } from '@/lib/people'
 import type { InventoryPeriod, PeriodSummary } from '@/types/api'
 
 const QTY = /^\d+(\.\d{1,3})?$/
@@ -19,36 +24,58 @@ function money(value: string | null): string {
   return value === null ? 'sin costo' : `Bs ${formatNumber(value, 2)}`
 }
 
+const periodSchema = z
+  .object({
+    name: z.string().trim().min(3, 'Mínimo 3 caracteres').max(80, 'Máximo 80 caracteres'),
+    start_date: z.string().min(1, 'Indique la fecha inicial'),
+    end_date: z.string().min(1, 'Indique la fecha final'),
+  })
+  .refine((v) => !v.start_date || !v.end_date || v.start_date <= v.end_date, {
+    message: 'Debe ser igual o posterior a la fecha inicial',
+    path: ['end_date'],
+  })
+type PeriodValues = z.infer<typeof periodSchema>
+
 function PeriodForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient()
-  const [name, setName] = useState('')
-  const [start, setStart] = useState('')
-  const [end, setEnd] = useState('')
+  const form = useForm<PeriodValues>({
+    resolver: zodResolver(periodSchema),
+    defaultValues: { name: '', start_date: '', end_date: '' },
+  })
+  const start = form.watch('start_date')
   const create = useMutation({
-    mutationFn: () => api.post('/inventory/periods', { name, start_date: start, end_date: end }),
+    mutationFn: (v: PeriodValues) => api.post('/inventory/periods', v),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory', 'periods'] })
       onDone()
     },
   })
+  const { errors } = form.formState
   return (
-    <div className="grid gap-3 sm:grid-cols-[1fr_11rem_11rem_auto] sm:items-end">
-      <Field label="Nombre del periodo" htmlFor="p-name">
-        <Input id="p-name" placeholder="Octubre 2026 / Gestión 2026" value={name} onChange={(e) => setName(e.target.value)} />
+    <form
+      onSubmit={form.handleSubmit((v) => create.mutate(v))}
+      className="grid gap-3 sm:grid-cols-[1fr_11rem_11rem_auto] sm:items-start"
+      noValidate
+    >
+      <Field label="Nombre del periodo" htmlFor="p-name" error={errors.name?.message}>
+        <Input id="p-name" placeholder="Octubre 2026 / Gestión 2026" {...form.register('name')} />
       </Field>
-      <Field label="Desde" htmlFor="p-start">
-        <Input id="p-start" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+      <Field label="Desde" htmlFor="p-start" error={errors.start_date?.message}>
+        <Input id="p-start" type="date" {...form.register('start_date')} />
       </Field>
-      <Field label="Hasta" htmlFor="p-end">
-        <Input id="p-end" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+      <Field label="Hasta" htmlFor="p-end" error={errors.end_date?.message}>
+        {/* La fecha final depende de la inicial. */}
+        <Input id="p-end" type="date" min={start || undefined} {...form.register('end_date')} />
       </Field>
-      <Button disabled={name.trim().length < 3 || !start || !end || create.isPending} onClick={() => create.mutate()}>
-        Abrir periodo
-      </Button>
+      <div className="sm:pt-6">
+        <Button type="submit" disabled={create.isPending}>
+          Abrir periodo
+        </Button>
+      </div>
       <div className="sm:col-span-4">
         <ErrorAlert error={create.error} />
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -79,7 +106,14 @@ function PeriodDetail({ periodId, canManage }: { periodId: number; canManage: bo
     },
     onSuccess: refresh,
   })
-  const close = useMutation({ mutationFn: () => api.post(`/inventory/periods/${periodId}/close`), onSuccess: refresh })
+  const [confirmClose, setConfirmClose] = useState(false)
+  const close = useMutation({
+    mutationFn: () => api.post(`/inventory/periods/${periodId}/close`),
+    onSuccess: () => {
+      refresh()
+      setConfirmClose(false)
+    },
+  })
 
   if (summary.isLoading) return <Loading />
   if (summary.error) return <ErrorAlert error={summary.error} />
@@ -87,6 +121,11 @@ function PeriodDetail({ periodId, canManage }: { periodId: number; canManage: bo
   const { period } = data
   const open = period.status === 'abierto'
   const invalid = Object.values(draft).some((v) => v !== '' && !QTY.test(v))
+  const notEnded = period.end_date >= todayIso()
+  // Conteos escritos pero no guardados: el cierre usa solo los guardados.
+  const unsaved = data.balances.some(
+    (b) => (draft[b.item.id] ?? '') !== (b.counted_quantity === null ? '' : String(Number(b.counted_quantity))),
+  )
   const report = (kind: string, format: string) =>
     downloadFile('/reports/export', { report: kind, format, period_id: period.id }, `${kind}_${period.start_date}.${format}`)
 
@@ -204,15 +243,41 @@ function PeriodDetail({ periodId, canManage }: { periodId: number; canManage: bo
             <Button variant="outline" disabled={invalid || saveCounts.isPending} onClick={() => saveCounts.mutate()}>
               Guardar conteo
             </Button>
-            <Button
-              disabled={close.isPending}
-              onClick={() => {
-                if (confirm(`¿Cerrar "${period.name}"? Se generarán los ajustes y no podrá modificarse.`)) close.mutate()
-              }}
-            >
+            <Button disabled={close.isPending} onClick={() => setConfirmClose(true)}>
               <Lock /> Cerrar periodo
             </Button>
           </div>
+        )}
+        {confirmClose && (
+          <ConfirmDialog
+            title={`Cerrar el periodo «${period.name}»`}
+            description="El cierre es definitivo: el periodo ya no admitirá movimientos ni cambios en el conteo."
+            confirmLabel={
+              <>
+                <Lock /> Cerrar periodo
+              </>
+            }
+            pendingLabel="Cerrando…"
+            destructive
+            disabled={unsaved || data.pending_count_items > 0 || notEnded}
+            pending={close.isPending}
+            error={close.error}
+            onConfirm={() => close.mutate()}
+            onClose={() => {
+              setConfirmClose(false)
+              close.reset()
+            }}
+          >
+            <p className="text-sm">Se generarán los ajustes por sobrante o faltante según el conteo físico.</p>
+            {/* Mismas condiciones que exige el backend: se avisan antes de intentar el cierre. */}
+            {(notEnded || data.pending_count_items > 0 || unsaved) && (
+              <ul className="text-danger grid list-disc gap-1 pl-5 text-sm font-medium">
+                {notEnded && <li>El periodo termina el {formatDate(period.end_date + 'T12:00:00')}: podrá cerrarse después de esa fecha.</li>}
+                {data.pending_count_items > 0 && <li>Faltan {data.pending_count_items} repuesto(s) por contar.</li>}
+                {unsaved && <li>Hay conteos sin guardar: use «Guardar conteo» primero.</li>}
+              </ul>
+            )}
+          </ConfirmDialog>
         )}
       </CardContent>
     </Card>

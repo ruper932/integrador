@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Plus } from 'lucide-react'
+import { AlertTriangle, KeyRound, Plus, UserX } from 'lucide-react'
 import { useState } from 'react'
 
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErrorAlert, Field, Loading, PageHeader, SecretNotice, StatusBadge } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,76 @@ function ciText(user: User): string {
   return [p.ci_number + (p.ci_complement ? `-${p.ci_complement}` : ''), p.ci_issued_in].filter(Boolean).join(' ')
 }
 
+/** Restablecer la contraseña: confirma las consecuencias y muestra la temporal en el mismo modal. */
+function ResetPasswordDialog({ user, onClose }: { user: User; onClose: () => void }) {
+  const qc = useQueryClient()
+  const reset = useMutation({
+    mutationFn: async () => (await api.post<UserWithTemporaryPassword>(`/users/${user.id}/reset-password`, {})).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  })
+  const temporary = reset.data?.temporary_password
+  return (
+    <ConfirmDialog
+      title={`Restablecer la contraseña de ${user.full_name}`}
+      description={reset.isSuccess ? undefined : `Usuario ${user.username}.`}
+      confirmLabel={
+        <>
+          <KeyRound /> Generar contraseña temporal
+        </>
+      }
+      pendingLabel="Generando…"
+      pending={reset.isPending}
+      error={reset.error}
+      onConfirm={() => reset.mutate()}
+      onClose={onClose}
+      done={
+        temporary && (
+          <SecretNotice title="Contraseña temporal" secret={temporary}>
+            Entréguela personalmente; deberá cambiarla al iniciar sesión.
+          </SecretNotice>
+        )
+      }
+    >
+      <ul className="text-muted-foreground grid list-disc gap-1 pl-5 text-sm">
+        <li>Se cerrarán todas sus sesiones abiertas.</li>
+        <li>Recibirá una contraseña temporal que deberá cambiar al ingresar.</li>
+        <li>La operación queda registrada en la auditoría.</li>
+      </ul>
+    </ConfirmDialog>
+  )
+}
+
+/** Desactivar una cuenta: no se elimina, pero deja de poder ingresar. */
+function DeactivateUserDialog({ user, onClose }: { user: User; onClose: () => void }) {
+  const qc = useQueryClient()
+  const deactivate = useMutation({
+    mutationFn: () => api.put(`/users/${user.id}`, { is_active: false }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      onClose()
+    },
+  })
+  return (
+    <ConfirmDialog
+      title={`Desactivar a ${user.full_name}`}
+      description="La cuenta no se elimina: se conserva su historial y puede reactivarse más adelante."
+      confirmLabel={
+        <>
+          <UserX /> Desactivar cuenta
+        </>
+      }
+      pendingLabel="Desactivando…"
+      destructive
+      pending={deactivate.isPending}
+      error={deactivate.error}
+      onConfirm={() => deactivate.mutate()}
+      onClose={onClose}
+    >
+      <p className="text-sm">No podrá iniciar sesión y se cerrarán sus sesiones abiertas.</p>
+    </ConfirmDialog>
+  )
+}
+
 export function UsersPage() {
   const qc = useQueryClient()
   const me = useMe()
@@ -32,6 +103,7 @@ export function UsersPage() {
   const [filters, setFilters] = useState<FilterValues>({})
   const [mode, setMode] = useState<{ kind: 'create' } | { kind: 'edit'; user: User } | null>(null)
   const [secret, setSecret] = useState<UserWithTemporaryPassword | null>(null)
+  const [action, setAction] = useState<{ kind: 'reset' | 'deactivate'; user: User } | null>(null)
   const users = useQuery({
     queryKey: ['users', q, filters],
     queryFn: async () => {
@@ -39,13 +111,10 @@ export function UsersPage() {
       return (await api.get<Page<User>>('/users', { params })).data
     },
   })
-  const toggle = useMutation({
-    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) => api.put(`/users/${id}`, { is_active }),
+  // Reactivar no tiene consecuencias que confirmar; desactivar sí (ver DeactivateUserDialog).
+  const reactivate = useMutation({
+    mutationFn: (id: number) => api.put(`/users/${id}`, { is_active: true }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
-  })
-  const reset = useMutation({
-    mutationFn: async (id: number) => (await api.post<UserWithTemporaryPassword>(`/users/${id}/reset-password`, {})).data,
-    onSuccess: setSecret,
   })
 
   return (
@@ -63,12 +132,20 @@ export function UsersPage() {
         }
       />
       {secret?.temporary_password && (
-        <div className="mb-4">
-          <SecretNotice title={`Contraseña temporal de ${secret.user.username}`} secret={secret.temporary_password}>
-            Entréguela personalmente al usuario.
-          </SecretNotice>
-        </div>
+        <ConfirmDialog
+          title={`Cuenta creada para ${secret.user.full_name}`}
+          confirmLabel="Listo"
+          onConfirm={() => setSecret(null)}
+          onClose={() => setSecret(null)}
+          done={
+            <SecretNotice title="Contraseña temporal" secret={secret.temporary_password}>
+              Entréguela personalmente; deberá cambiarla al iniciar sesión.
+            </SecretNotice>
+          }
+        />
       )}
+      {action?.kind === 'reset' && <ResetPasswordDialog user={action.user} onClose={() => setAction(null)} />}
+      {action?.kind === 'deactivate' && <DeactivateUserDialog user={action.user} onClose={() => setAction(null)} />}
       {mode && (
         <Card className="mb-4">
           <CardHeader>
@@ -91,7 +168,7 @@ export function UsersPage() {
           <Input id="u-q" placeholder="Nombre, apellido, CI o usuario" value={q} onChange={(e) => setQ(e.target.value)} />
         </Field>
       </FilterToolbar>
-      <ErrorAlert error={users.error ?? toggle.error ?? reset.error} />
+      <ErrorAlert error={users.error ?? reactivate.error} />
       {users.isLoading ? (
         <Loading />
       ) : (
@@ -146,20 +223,19 @@ export function UsersPage() {
                       <Button size="sm" variant="outline" onClick={() => setMode({ kind: 'edit', user: u })}>
                         Editar
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          if (confirm(`¿Restablecer la contraseña de ${u.username}? Se cerrarán sus sesiones.`)) reset.mutate(u.id)
-                        }}
-                      >
-                        Restablecer clave
+                      <Button size="sm" variant="ghost" onClick={() => setAction({ kind: 'reset', user: u })}>
+                        <KeyRound /> Restablecer clave
                       </Button>
-                      {u.id !== me.data?.id && (
-                        <Button size="sm" variant="ghost" onClick={() => toggle.mutate({ id: u.id, is_active: !u.is_active })}>
-                          {u.is_active ? 'Desactivar' : 'Reactivar'}
-                        </Button>
-                      )}
+                      {u.id !== me.data?.id &&
+                        (u.is_active ? (
+                          <Button size="sm" variant="ghost" onClick={() => setAction({ kind: 'deactivate', user: u })}>
+                            <UserX /> Desactivar
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="ghost" onClick={() => reactivate.mutate(u.id)} disabled={reactivate.isPending}>
+                            Reactivar
+                          </Button>
+                        ))}
                       </div>
                     </TableCell>
                   </TableRow>

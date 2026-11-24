@@ -15,6 +15,7 @@ export type FilterValues = Record<string, string>
 
 const QUALITY = { valida: 'Válida', sin_dato: 'Sin dato', fuera_de_rango: 'Fuera de rango', unidad_invalida: 'Unidad inválida', invalida: 'Inválida' }
 const DEVICE_STATUS = { activo: 'Activo', inactivo: 'Inactivo', mantenimiento: 'En mantenimiento' }
+const CONNECTION = { al_dia: 'Al día', desactualizado: 'Desactualizado', sin_comunicacion: 'Sin comunicación' }
 const CONDITIONS = { nuevo: 'Nuevo', usado: 'Usado', reacondicionado: 'Reacondicionado', en_revision: 'En revisión', danado: 'Dañado' }
 const ORIGINS = { incidencia: 'Atención de reportes de incidencia', directo: 'Registro directo' }
 const BUCKETS = { hour: 'Hora', day: 'Día', week: 'Semana', month: 'Mes' }
@@ -229,6 +230,8 @@ export function ReportFilterField(props: FieldProps) {
       return <Select {...props} choices={entries(QUALITY)} allLabel="Todas" />
     case 'device_status':
       return <Select {...props} choices={entries(DEVICE_STATUS)} />
+    case 'connection':
+      return <Select {...props} choices={entries(CONNECTION)} />
     case 'category_id':
       return <CategorySelect {...props} />
     case 'item_id':

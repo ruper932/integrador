@@ -9,7 +9,7 @@ import { BarChart3 } from 'lucide-react'
 // Una sola serie por gráfico (el título la nombra) y un único eje Y. Sin animaciones:
 // los equipos de la institución pueden ser modestos. Cada variable tiene su color para
 // reconocerla de un vistazo; las no listadas usan el azul del agua.
-const SERIES_COLOR: Record<string, string> = {
+export const SERIES_COLOR: Record<string, string> = {
   temperatura: 'var(--chart-3)',
   humedad_relativa: 'var(--chart-2)',
   presion_atmosferica: 'var(--chart-4)',
@@ -60,9 +60,9 @@ export function SeriesChart({ series }: { series: Series }) {
   const common = (
     <>
       <CartesianGrid vertical={false} stroke={GRID} strokeDasharray="3 5" />
-      <XAxis dataKey="x" tick={{ fill: AXIS, fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={16} />
+      <XAxis dataKey="x" tick={{ fill: AXIS, fontSize: 12 }} tickLine={false} axisLine={false} minTickGap={16} />
       <YAxis
-        tick={{ fill: AXIS, fontSize: 11 }}
+        tick={{ fill: AXIS, fontSize: 12 }}
         tickLine={false}
         axisLine={false}
         width={52}

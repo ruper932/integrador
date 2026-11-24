@@ -14,8 +14,9 @@ import { useLogin, useMe } from '@/features/auth/useAuth'
 export { AuthShell } from '@/features/auth/AuthShell'
 
 const schema = z.object({
-  username: z.string().trim().min(1, 'Ingrese su usuario'),
-  password: z.string().min(1, 'Ingrese su contraseña'),
+  // Mismos límites que el backend (LoginRequest); la contraseña no se recorta: los espacios cuentan.
+  username: z.string().trim().min(1, 'Ingrese su usuario').max(64, 'Máximo 64 caracteres'),
+  password: z.string().min(1, 'Ingrese su contraseña').max(128, 'Máximo 128 caracteres'),
 })
 type FormValues = z.infer<typeof schema>
 

@@ -21,9 +21,11 @@ const KEY = ['notifications']
 /** Avisos internos (sin servicios externos). Se consultan periódicamente al servidor local. */
 export function NotificationBell({
   onOpenIncident,
+  onOpenRelocation,
   side = 'bottom',
 }: {
   onOpenIncident: (id: number) => void
+  onOpenRelocation: (id: number) => void
   side?: 'bottom' | 'right'
 }) {
   const qc = useQueryClient()
@@ -70,9 +72,9 @@ export function NotificationBell({
             aria-label={unread ? `Avisos: ${unread} sin leer` : 'Avisos'}
             title="Avisos"
           >
-            <Bell />
+            <Bell className="size-5" />
             {unread > 0 && (
-              <span className="bg-danger text-primary-foreground absolute -top-1.5 -right-1.5 grid h-4.5 min-w-4.5 place-items-center rounded-full px-1 text-[10px] leading-none font-semibold">
+              <span className="bg-attention text-attention-foreground absolute -top-2 -right-2 grid h-5.5 min-w-5.5 place-items-center rounded-full px-1.5 text-xs leading-none font-bold ring-2 ring-[var(--card)]">
                 {unread > 9 ? '9+' : unread}
               </span>
             )}
@@ -107,11 +109,12 @@ export function NotificationBell({
                   onSelect={() => {
                     if (!n.read_at) markRead.mutate(n.id)
                     if (n.incident_report_id) onOpenIncident(n.incident_report_id)
+                    else if (n.relocation_id) onOpenRelocation(n.relocation_id)
                   }}
                 >
                   <span
                     aria-hidden
-                    className={cn('mt-1.5 size-2 shrink-0 rounded-full', n.read_at ? 'bg-transparent' : 'bg-primary')}
+                    className={cn('mt-1.5 size-2 shrink-0 rounded-full', n.read_at ? 'bg-transparent' : 'bg-attention')}
                   />
                   <span className="min-w-0">
                     <span className={cn('block text-sm', !n.read_at && 'font-semibold')}>
@@ -119,7 +122,7 @@ export function NotificationBell({
                       {!n.read_at && <span className="sr-only"> (sin leer)</span>}
                     </span>
                     <span className="text-muted-foreground block text-xs whitespace-normal">{n.message}</span>
-                    <span className="text-muted-foreground block text-[11px]">{formatDateTime(n.created_at)}</span>
+                    <span className="text-muted-foreground block text-xs">{formatDateTime(n.created_at)}</span>
                   </span>
                 </DropdownMenuItem>
               ))}

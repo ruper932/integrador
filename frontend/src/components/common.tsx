@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowRight,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -38,7 +39,7 @@ export function PageHeader({
           <div className="text-muted-foreground mb-1 text-xs font-medium">{eyebrow}</div>
         )}
         <h1 className="font-heading text-2xl leading-tight font-semibold md:text-[28px]">{title}</h1>
-        {description && <p className="text-muted-foreground mt-1 max-w-3xl text-sm">{description}</p>}
+        {description && <p className="text-muted-foreground mt-1 max-w-[70ch] text-sm">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -77,7 +78,7 @@ export function Notice({
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
       <div className="min-w-0 flex-1">
         {title && <div className="font-semibold">{title}</div>}
-        {children && <div className={cn(title && 'mt-0.5', 'opacity-90')}>{children}</div>}
+        {children && <div className={cn(title && 'mt-0.5')}>{children}</div>}
       </div>
       {action && <div className="shrink-0 self-center">{action}</div>}
     </div>
@@ -153,11 +154,11 @@ export function StatCard({
 }) {
   return (
     <div className="bg-card shadow-card min-w-0 rounded-xl border p-4 sm:p-5">
-      <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
+      <div className="text-muted-foreground flex items-center justify-between gap-2 text-sm">
         <span>{label}</span>
         {Icon && (
           <span className={cn('hidden rounded-lg p-2 sm:inline-flex', TONE_COLOR[color])}>
-            <Icon className="size-4" aria-hidden />
+            <Icon className="size-5" aria-hidden />
           </span>
         )}
       </div>
@@ -168,7 +169,7 @@ export function StatCard({
       {foot && (
         <div
           className={cn(
-            'flex items-center gap-1.5 text-[11px]',
+            'flex items-center gap-1.5 text-xs',
             tone === 'warning' ? 'text-warning' : tone === 'success' ? 'text-success' : 'text-muted-foreground',
           )}
         >
@@ -363,5 +364,48 @@ export function SecretNotice({ title, secret, children }: { title: string; secre
       </div>
       <span className="mt-1.5 block text-xs">Se muestra una sola vez. {children}</span>
     </Notice>
+  )
+}
+
+/**
+ * Recuadro «Siguiente paso» de un proceso: dice a quién le toca y qué ocurrirá, con las acciones al alcance
+ * (arriba del detalle, no al final). Cuando le toca a otra persona se muestra atenuado y sin acciones.
+ */
+export function NextStepCard({
+  yourTurn,
+  title,
+  children,
+  actions,
+}: {
+  yourTurn: boolean
+  title: ReactNode
+  children?: ReactNode
+  actions?: ReactNode
+}) {
+  return (
+    <section
+      aria-label="Siguiente paso"
+      className={cn('grid gap-3 rounded-xl border p-4', yourTurn ? 'bg-attention-soft border-attention/40 border-l-4 border-l-attention' : 'bg-muted/50')}
+    >
+      <div>
+        <div className={cn('flex items-center gap-1.5 text-sm font-semibold', yourTurn && 'text-attention-ink')}>
+          {yourTurn ? <ArrowRight className="size-3.5" aria-hidden /> : <Circle className="size-3" aria-hidden />}
+          {yourTurn ? 'Le toca a usted' : 'Siguiente paso'}
+        </div>
+        <div className="mt-1 font-semibold">{title}</div>
+        {children && <div className="mt-0.5 text-sm">{children}</div>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </section>
+  )
+}
+
+/** Marca de la lista para los casos en que la persona debe actuar. */
+export function YourTurnBadge({ action }: { action: string }) {
+  return (
+    <Badge className="bg-attention text-attention-foreground">
+      <ArrowRight aria-hidden />
+      Su turno: {action.toLowerCase()}
+    </Badge>
   )
 }

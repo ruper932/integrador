@@ -1,20 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   Boxes,
+  BrainCircuit,
   ChevronUp,
   ClipboardList,
   CloudFog,
   Cpu,
+  HardDriveUpload,
   ChartColumn,
   History,
   KeyRound,
   LayoutDashboard,
+  MonitorDot,
   LifeBuoy,
   LogOut,
   Menu,
   MessageSquareWarning,
   Moon,
   Sun,
+  Truck,
   UserRound,
   Users,
   Wrench,
@@ -34,21 +38,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useLogout, useMe } from '@/features/auth/useAuth'
+import { StationStatusPanel } from '@/features/devices/StationStatusPanel'
 import { useIncidentSummary } from '@/features/incidents/api'
+import { HighAlertGate } from '@/features/incidents/IncidentAlerts'
 import { NotificationBell } from '@/features/incidents/NotificationBell'
 import { useTheme } from '@/hooks/useTheme'
 import { api } from '@/lib/api'
-import { allowed, INCIDENT_PERMISSIONS } from '@/lib/permissions'
+import { allowed, INCIDENT_PERMISSIONS, RELOCATION_PERMISSIONS } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
-import type { InventoryItem, Me, Page, RecoveryRequest } from '@/types/api'
+import type { InventoryItem, Me, Page, RecoveryRequest, RelocationSummary } from '@/types/api'
 
 interface NavItem {
   to: string
   label: string
   icon: LucideIcon
-  /** Permiso requerido; con una lista basta cualquiera de ellos. */
-  permission: string | string[]
-  badge?: 'lowStock' | 'pendingRecovery' | 'openIncidents'
+  /** Permiso requerido; con una lista basta cualquiera de ellos. Sin permiso: visible para cualquier rol. */
+  permission?: string | string[]
+  badge?: 'lowStock' | 'pendingRecovery' | 'openIncidents' | 'openRelocations'
 }
 
 interface NavGroup {
@@ -62,8 +68,11 @@ const NAV: NavGroup[] = [
     label: 'Principal',
     items: [
       { to: '/', label: 'Resumen general', icon: LayoutDashboard, permission: 'dashboard.consultar' },
+      { to: '/monitoreo', label: 'Monitoreo en vivo', icon: MonitorDot, permission: 'dashboard.consultar' },
       { to: '/historicos', label: 'Histórico de lecturas', icon: History, permission: 'mediciones.consultar' },
       { to: '/analisis', label: 'Análisis estadístico', icon: ChartColumn, permission: 'reportes.generar' },
+      // Provisional: modelo entrenado con datos simulados (ver backend/app/business/ml/prediction_service.py).
+      { to: '/estimacion', label: 'Estimación de volumen', icon: BrainCircuit },
     ],
   },
   {
@@ -79,7 +88,15 @@ const NAV: NavGroup[] = [
         permission: INCIDENT_PERMISSIONS,
         badge: 'openIncidents',
       },
+      {
+        to: '/reubicaciones',
+        label: 'Reubicaciones',
+        icon: Truck,
+        permission: RELOCATION_PERMISSIONS,
+        badge: 'openRelocations',
+      },
       { to: '/mantenimiento', label: 'Mantenimiento', icon: Wrench, permission: 'mantenimiento.consultar' },
+      { to: '/firmware', label: 'Firmware de estaciones', icon: HardDriveUpload, permission: 'firmware.gestionar' },
     ],
   },
   {
@@ -124,10 +141,18 @@ function useBadges(user: Me) {
     refetchInterval: 2 * 60_000,
   })
   const incidents = useIncidentSummary(canAttend)
+  const canRelocate = user.permissions.includes('reubicaciones.atender')
+  const relocations = useQuery({
+    queryKey: ['relocations', 'summary'],
+    queryFn: async () => (await api.get<RelocationSummary>('/relocations/summary')).data,
+    enabled: canRelocate,
+    refetchInterval: 2 * 60_000,
+  })
   return {
     lowStock: lowStock.data?.length ?? 0,
     pendingRecovery: pending.data ?? 0,
     openIncidents: canAttend ? (incidents.data?.open ?? 0) : 0,
+    openRelocations: canRelocate ? (relocations.data?.open ?? 0) : 0,
   }
 }
 
@@ -227,7 +252,7 @@ function Shell({
   const badges = useBadges(user)
   const server = useServerStatus()
   const online = server.data === true
-  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => allowed(user.permissions, i.permission)) })).filter(
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.permission || allowed(user.permissions, i.permission)) })).filter(
     (g) => g.items.length > 0,
   )
   const menuExpanded = isMobile ? mobileOpen : !collapsed
@@ -278,6 +303,7 @@ function Shell({
           <NotificationBell
             side={collapsed ? 'right' : 'bottom'}
             onOpenIncident={(id) => onNavigate(`/incidencias?reporte=${id}`)}
+            onOpenRelocation={(id) => onNavigate(`/reubicaciones?solicitud=${id}`)}
           />
         </div>
 
@@ -308,16 +334,16 @@ function Shell({
                     )
                   }
                 >
-                  <Icon className="size-4.5 shrink-0" aria-hidden />
+                  <Icon className="size-5 shrink-0" aria-hidden />
                   {showLabels && <span className="truncate">{label}</span>}
                   {count > 0 &&
                     (showLabels ? (
-                      <span className="bg-warning-soft text-warning ml-auto rounded-md px-1.5 text-[11px] font-medium">
+                      <span className="bg-warning-soft text-warning ml-auto min-w-6 rounded-md px-1.5 py-0.5 text-center text-xs font-semibold">
                         {count}
                         <span className="sr-only"> pendientes</span>
                       </span>
                     ) : (
-                      <span className="bg-warning absolute top-2 right-4 size-2 rounded-full" aria-label={`${count} pendientes`} />
+                      <span className="bg-warning absolute top-1.5 right-3 size-2.5 rounded-full" aria-label={`${count} pendientes`} />
                     ))}
                 </NavLink>
               )
@@ -341,6 +367,9 @@ function Shell({
               </>
             )}
           </div>
+          {user.permissions.includes('dashboard.consultar') && (
+            <StationStatusPanel collapsed={collapsed} canManage={user.permissions.includes('infraestructura.consultar')} />
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -403,8 +432,8 @@ function Shell({
             aria-label="Desplegar menú lateral"
           >
             <Menu className="size-5" />
-            {badges.openIncidents > 0 && (
-              <span className="bg-warning absolute top-1.5 right-1.5 size-2 rounded-full" aria-hidden />
+            {badges.openIncidents + badges.openRelocations > 0 && (
+              <span className="bg-warning absolute top-1.5 right-1.5 size-2.5 rounded-full" aria-hidden />
             )}
           </Button>
         )}
@@ -419,8 +448,12 @@ function Shell({
               Los datos mostrados pueden no estar actualizados. Verifique la red de la institución.
             </Notice>
           )}
+          <HighAlertGate
+            enabled={allowed(user.permissions, INCIDENT_PERMISSIONS)}
+            onReviewed={(id) => onNavigate(`/incidencias?reporte=${id}`)}
+          />
           <Outlet />
-          <footer className="text-muted-foreground mt-8 flex flex-wrap justify-between gap-2 border-t pt-4 text-[11px]">
+          <footer className="text-muted-foreground mt-8 flex flex-wrap justify-between gap-2 border-t pt-4 text-xs">
             <span>ATINA · C.E.A. “Ildefonso de las Muñecas” · Titicachi, Chuma, La Paz</span>
             <span>Funcionamiento local · sin servicios externos</span>
           </footer>
@@ -435,7 +468,7 @@ export function HomeRoute({ dashboard }: { dashboard: React.ReactNode }) {
   const me = useMe()
   const permissions = me.data?.permissions ?? []
   if (permissions.includes('dashboard.consultar')) return <>{dashboard}</>
-  const first = NAV.flatMap((g) => g.items).find((i) => allowed(permissions, i.permission))
+  const first = NAV.flatMap((g) => g.items).find((i) => !i.permission || allowed(permissions, i.permission))
   return <Navigate to={first?.to ?? '/perfil'} replace />
 }
 

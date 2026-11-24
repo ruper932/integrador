@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErrorAlert, Field, Loading, NativeSelect, Notice, PageHeader } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,26 +19,27 @@ import { listParams } from '@/features/reports/params'
 import type { FilterValues } from '@/features/reports/ReportFilterField'
 import { api } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { code, name } from '@/lib/validation'
 import type { InventoryCategory, InventoryItem, InventoryMovement, Page } from '@/types/api'
 
 const decimal = z.string().regex(/^\d+(\.\d{1,3})?$/, 'Número con hasta 3 decimales')
 
 const itemSchema = z.object({
-  code: z.string().regex(/^[A-Za-z0-9_.-]{2,40}$/, 'Solo letras, números, guion y punto (2–40)'),
-  name: z.string().min(2, 'Mínimo 2 caracteres'),
+  code: code,
+  name: name(150),
   category_id: z.string().min(1, 'Seleccione una categoría'),
-  unit: z.string().min(1, 'Indique la unidad'),
+  unit: z.string().trim().min(1, 'Indique la unidad').max(20, 'Máximo 20 caracteres'),
   min_stock: decimal,
   initial_stock: decimal,
   initial_unit_cost: z.string().regex(/^(\d+(\.\d{1,4})?)?$/, 'Monto en Bs, hasta 4 decimales'),
-  storage_location: z.string().optional(),
+  storage_location: z.string().trim().max(120, 'Máximo 120 caracteres').optional(),
 })
 type ItemValues = z.infer<typeof itemSchema>
 
 const movementSchema = z.object({
   movement_type: z.enum(['entrada', 'salida']),
   quantity: decimal.refine((v) => Number(v) > 0, 'Debe ser mayor que cero'),
-  reason: z.string().min(3, 'Indique el motivo'),
+  reason: z.string().trim().min(3, 'Indique el motivo').max(255, 'Máximo 255 caracteres'),
   unit_cost: z.string().regex(/^(\d+(\.\d{1,4})?)?$/, 'Monto en Bs, hasta 4 decimales'),
 })
 type MovementValues = z.infer<typeof movementSchema>
@@ -130,7 +132,13 @@ function ItemDetail({ item, canManage }: { item: InventoryItem; canManage: boole
     queryFn: async () => (await api.get<Page<InventoryMovement>>(`/inventory/items/${item.id}/movements`)).data,
   })
   const form = useForm<MovementValues>({
-    resolver: zodResolver(movementSchema),
+    // Una salida depende del stock disponible del repuesto.
+    resolver: zodResolver(
+      movementSchema.refine((v) => v.movement_type !== 'salida' || Number(v.quantity) <= Number(item.current_stock), {
+        message: `No puede superar el stock disponible (${formatNumber(item.current_stock, 3)} ${item.unit})`,
+        path: ['quantity'],
+      }),
+    ),
     defaultValues: { movement_type: 'entrada', quantity: '', reason: '', unit_cost: '' },
   })
   const isEntry = form.watch('movement_type') === 'entrada'
@@ -280,6 +288,7 @@ function ItemsTab() {
   const [filters, setFilters] = useState<FilterValues>({})
   const [showForm, setShowForm] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [toDeactivate, setToDeactivate] = useState<InventoryItem | null>(null)
 
   const items = useQuery({
     queryKey: ['inventory', 'items', q, filters],
@@ -294,7 +303,10 @@ function ItemsTab() {
   })
   const deactivate = useMutation({
     mutationFn: (id: number) => api.delete(`/inventory/items/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inventory'] })
+      setToDeactivate(null)
+    },
   })
   const selected = items.data?.items.find((i) => i.id === selectedId)
 
@@ -338,7 +350,28 @@ function ItemsTab() {
         </Field>
       </FilterToolbar>
 
-      <ErrorAlert error={items.error ?? deactivate.error} />
+      <ErrorAlert error={items.error} />
+      {toDeactivate && (
+        <ConfirmDialog
+          title={`Desactivar ${toDeactivate.name}`}
+          description={`Código ${toDeactivate.code} · stock actual ${formatNumber(toDeactivate.current_stock, 3)} ${toDeactivate.unit}`}
+          confirmLabel="Desactivar repuesto"
+          pendingLabel="Desactivando…"
+          destructive
+          pending={deactivate.isPending}
+          error={deactivate.error}
+          onConfirm={() => deactivate.mutate(toDeactivate.id)}
+          onClose={() => {
+            setToDeactivate(null)
+            deactivate.reset()
+          }}
+        >
+          <p className="text-sm">
+            No se elimina: se conserva su historial de movimientos, pero ya no podrá usarse en entradas, salidas ni
+            mantenimientos.
+          </p>
+        </ConfirmDialog>
+      )}
       {items.isLoading ? (
         <Loading />
       ) : (
@@ -385,9 +418,7 @@ function ItemsTab() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => {
-                            if (confirm(`¿Desactivar ${item.code}? Se conserva su historial.`)) deactivate.mutate(item.id)
-                          }}
+                          onClick={() => setToDeactivate(item)}
                         >
                           Desactivar
                         </Button>

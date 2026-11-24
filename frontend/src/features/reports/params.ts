@@ -31,6 +31,7 @@ export const FILTER_LABELS: Record<string, string> = {
   fog_collector_id: 'Atrapanieblas',
   quality: 'Calidad de la lectura',
   device_status: 'Estado del dispositivo',
+  connection: 'Comunicación',
   category_id: 'Categoría',
   item_id: 'Repuesto',
   condition: 'Estado del repuesto',

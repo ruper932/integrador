@@ -26,7 +26,8 @@ import { ageOn, birthDateError, earliestGraduationYear, latestAdultBirthDate, MI
 import type { AcademicLevel, CiDepartment, DegreeInput, ProfileInput, Role, User, UserWithTemporaryPassword } from '@/types/api'
 
 // Las reglas definitivas se validan en el backend; aquí se orienta al usuario mientras escribe.
-const NAME = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]*$/
+// Vacío (apellido opcional) o con al menos una letra, igual que la API: «--» no es un nombre.
+const NAME = /^(?:[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]*[A-Za-zÁÉÍÓÚÜÑáéíóúüñ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]*)?$/
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 const optionalEmail = z.string().trim().refine((v) => v === '' || EMAIL.test(v), 'Correo no válido')
 const currentYear = new Date().getFullYear()
